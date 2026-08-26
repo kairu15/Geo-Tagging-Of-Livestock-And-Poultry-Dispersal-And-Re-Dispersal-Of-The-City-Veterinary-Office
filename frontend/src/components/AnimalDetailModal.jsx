@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { X, MapPin, Calendar, User, ExternalLink } from 'lucide-react';
 import { useAnimal, useAnimalHistory } from '../api/hooks';
@@ -44,8 +45,8 @@ export default function AnimalDetailModal({ animalId, onClose }) {
 
   if (!animalId) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+  return createPortal(
+    <div data-portal className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
@@ -196,7 +197,8 @@ export default function AnimalDetailModal({ animalId, onClose }) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

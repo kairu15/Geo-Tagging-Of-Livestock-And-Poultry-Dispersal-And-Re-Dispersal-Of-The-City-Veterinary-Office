@@ -284,6 +284,63 @@ def active_animals_map(request):
     })
 
 
+@api_view(["GET"])
+@perm_decorator([IsAuthenticated])
+def active_animals_paths(request):
+    """GET /api/v1/dispersal/map/active-animals/paths/ — GeoJSON LineStrings for movement polylines."""
+    # Get all ownership records with coordinates, grouped by animal
+    records = (
+        OwnershipRecord.objects
+        .filter(start_latitude__isnull=False, start_longitude__isnull=False)
+        .select_related("animal", "animal__species")
+        .order_by("animal__id", "start_date")
+    )
+
+    # Group by animal
+    animal_paths = {}
+    for rec in records:
+        aid = rec.animal.id
+        if aid not in animal_paths:
+            animal_paths[aid] = {
+                "animal_id": aid,
+                "tag_id": rec.animal.tag_id,
+                "species": rec.animal.species.name if rec.animal.species else None,
+                "points": [],
+            }
+        animal_paths[aid]["points"].append({
+            "lat": float(rec.start_latitude),
+            "lng": float(rec.start_longitude),
+            "date": str(rec.start_date),
+            "transfer_type": rec.transfer_type,
+        })
+
+    # Build GeoJSON FeatureCollection with LineStrings
+    features = []
+    for aid, path in animal_paths.items():
+        if len(path["points"]) < 2:
+            continue  # Need at least 2 points for a line
+        coords = [[p["lng"], p["lat"]] for p in path["points"]]
+        feature = {
+            "type": "Feature",
+            "geometry": {
+                "type": "LineString",
+                "coordinates": coords,
+            },
+            "properties": {
+                "animal_id": aid,
+                "tag_id": path["tag_id"],
+                "species": path["species"],
+                "points": path["points"],
+            },
+        }
+        features.append(feature)
+
+    return Response({
+        "type": "FeatureCollection",
+        "features": features,
+    })
+
+
 # ---------------------------------------------------------------------------
 # Reports endpoints
 # ---------------------------------------------------------------------------

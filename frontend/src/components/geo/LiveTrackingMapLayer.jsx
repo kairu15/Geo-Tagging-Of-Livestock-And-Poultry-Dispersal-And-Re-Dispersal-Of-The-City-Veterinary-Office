@@ -1,240 +1,220 @@
 import { useEffect, useRef, useState } from 'react';
-import * as maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { useActiveGeoMap, useActiveAnimalsMap } from '../../api/hooks';
-import { Layers, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
+import { Layers, ChevronDown, ChevronUp } from 'lucide-react';
 import AnimalDetailModal from '../AnimalDetailModal';
 
-const BAYAWAN_CENTER = [122.8353, 9.6894];
+const BAYAWAN = [9.6894, 122.8353];
 
-const RASTER_STYLE = {
-  version: 8,
-  sources: {
-    'osm-raster': {
-      type: 'raster',
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      attribution: '© OpenStreetMap contributors',
-    },
-  },
-  layers: [{ id: 'osm-tiles', type: 'raster', source: 'osm-raster', minzoom: 0, maxzoom: 19 }],
-};
-
-const caretakerTypeColors = {
+const CARETAKER_COLORS = {
   FORMAL_BENEFICIARY: '#3b82f6',
   INFORMAL_CARETAKER: '#a855f7',
   TEMPORARY_FOSTER: '#eab308',
   CVO_HOLDING_FACILITY: '#6b7280',
 };
-
-const caretakerTypeLabels = {
+const CARETAKER_LABELS = {
   FORMAL_BENEFICIARY: 'Formal Beneficiary',
   INFORMAL_CARETAKER: 'Informal Caretaker',
   TEMPORARY_FOSTER: 'Temporary Foster',
   CVO_HOLDING_FACILITY: 'CVO Facility',
 };
 
-function createMarkerElement(color, label) {
-  const el = document.createElement('div');
-  el.style.cssText = `
-    width: 24px;
-    height: 24px;
-    background: ${color};
-    border: 3px solid white;
-    border-radius: 50%;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    cursor: pointer;
-    transition: transform 0.2s;
-  `;
-  el.onmouseenter = () => { el.style.transform = 'scale(1.3)'; };
-  el.onmouseleave = () => { el.style.transform = 'scale(1)'; };
-  el.title = label;
-  return el;
+function makeIcon(color) {
+  return L.divIcon({
+    className: '',
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+    popupAnchor: [0, -12],
+    html: `<div style="
+      width:20px;height:20px;background:${color};
+      border:2px solid #fff;border-radius:50%;
+      box-shadow:0 1px 4px rgba(0,0,0,.35);
+    "></div>`,
+  });
 }
 
 export default function LiveTrackingMapLayer({ filters = {}, height = '500px', onFeatureClick }) {
-  const mapContainer = useRef(null);
+  const containerRef = useRef(null);
   const mapRef = useRef(null);
-  const markersRef = useRef([]);
-  const linesRef = useRef([]);
+  const geoGroupRef = useRef(null);
+  const dispGroupRef = useRef(null);
+  const dotsGroupRef = useRef(null);
   const [selectedAnimalId, setSelectedAnimalId] = useState(null);
   const [panelOpen, setPanelOpen] = useState(true);
   const [showGeo, setShowGeo] = useState(true);
   const [showDispersal, setShowDispersal] = useState(true);
+  const [markerCount, setMarkerCount] = useState(0);
 
-  const { data: geoData } = useActiveGeoMap(filters);
-  const { data: dispersalData } = useActiveAnimalsMap();
+  const { data: geoData, isLoading: geoLoading } = useActiveGeoMap(filters);
+  const { data: dispersalData, isLoading: dispLoading } = useActiveAnimalsMap();
 
-  // Initialize map once
+  // Store latest data in refs
+  const geoDataRef = useRef(geoData);
+  const dispDataRef = useRef(dispersalData);
+  const showGeoRef = useRef(showGeo);
+  const showDispersalRef = useRef(showDispersal);
+
+  useEffect(() => { geoDataRef.current = geoData; }, [geoData]);
+  useEffect(() => { dispDataRef.current = dispersalData; }, [dispersalData]);
+  useEffect(() => { showGeoRef.current = showGeo; }, [showGeo]);
+  useEffect(() => { showDispersalRef.current = showDispersal; }, [showDispersal]);
+
+  function clearLayers() {
+    geoGroupRef.current?.clearLayers();
+    dispGroupRef.current?.clearLayers();
+    dotsGroupRef.current?.clearLayers();
+  }
+
+  function addMarkers(map, geo, dispersal, sg, sd) {
+    clearLayers();
+    let count = 0;
+    const allCoords = [];
+
+    // ── Geo-tag markers ──
+    if (sg && geo?.features?.length) {
+      for (const f of geo.features) {
+        const [lng, lat] = f.geometry.coordinates;
+        const p = f.properties;
+        const color = CARETAKER_COLORS[p.caretaker_type] || '#6b7280';
+
+        const popupHtml = `<div style="padding:8px;min-width:180px;font-family:system-ui,sans-serif">
+          <p style="font-weight:600;margin:0">${p.tag_code || ''}</p>
+          <p style="color:#555;margin:2px 0">${p.animal_tag || ''} — ${p.species || ''}</p>
+          <p style="color:#555;margin:2px 0">Caretaker: ${p.caretaker_name || ''}</p>
+          <p style="color:#888;font-size:12px">${CARETAKER_LABELS[p.caretaker_type] || ''}</p>
+          ${!p.has_dispersion_link ? '<p style="color:#a855f7;font-size:11px;font-weight:500;margin-top:4px">⚡ Field-Recorded</p>' : ''}
+        </div>`;
+
+        const marker = L.marker([lat, lng], { icon: makeIcon(color) })
+          .bindPopup(popupHtml, { closeButton: false, offset: [0, -12] });
+
+        marker.on('click', () => {
+          if (p.animal_id) setSelectedAnimalId(String(p.animal_id));
+          onFeatureClick?.(p, 'geo');
+        });
+
+        geoGroupRef.current.addLayer(marker);
+        allCoords.push([lat, lng]);
+        count++;
+      }
+
+      // Dashed line traces between points of same animal
+      const groups = {};
+      for (const f of geo.features) {
+        const aid = f.properties.animal_id;
+        if (!groups[aid]) groups[aid] = [];
+        groups[aid].push(f.geometry.coordinates);
+      }
+      for (const coords of Object.values(groups)) {
+        if (coords.length < 2) continue;
+        const latLngs = coords.map((c) => [c[1], c[0]]);
+        L.polyline(latLngs, {
+          color: '#a855f7',
+          weight: 1.5,
+          opacity: 0.5,
+          dashArray: '4, 6',
+        }).addTo(dotsGroupRef.current);
+      }
+    }
+
+    // ── Dispersal markers ──
+    if (sd && dispersal?.features?.length) {
+      for (const f of dispersal.features) {
+        const [lng, lat] = f.geometry.coordinates;
+        const p = f.properties;
+
+        const popupHtml = `<div style="padding:8px;min-width:180px;font-family:system-ui,sans-serif">
+          <p style="font-weight:600;margin:0">${p.tag_id || ''}</p>
+          <p style="color:#555;margin:2px 0">${p.species || ''}</p>
+          <p style="color:#555;margin:2px 0">Owner: ${p.beneficiary_name || ''}</p>
+          <p style="color:#888;font-size:12px">${p.transfer_type || ''} — ${p.start_date || ''}</p>
+        </div>`;
+
+        const marker = L.marker([lat, lng], { icon: makeIcon('#16a34a') })
+          .bindPopup(popupHtml, { closeButton: false, offset: [0, -12] });
+
+        marker.on('click', () => {
+          if (p.id) setSelectedAnimalId(String(p.id));
+          onFeatureClick?.(p, 'dispersal');
+        });
+
+        dispGroupRef.current.addLayer(marker);
+        allCoords.push([lat, lng]);
+        count++;
+      }
+    }
+
+    setMarkerCount(count);
+
+    if (allCoords.length > 0) {
+      map.fitBounds(L.latLngBounds(allCoords), { padding: [50, 50], maxZoom: 14 });
+    }
+  }
+
+  function tryAddMarkers() {
+    const map = mapRef.current;
+    if (!map) return;
+    addMarkers(map, geoDataRef.current, dispDataRef.current, showGeoRef.current, showDispersalRef.current);
+  }
+
+  // Init map once
   useEffect(() => {
-    if (mapRef.current || !mapContainer.current) return;
+    if (mapRef.current || !containerRef.current) return;
 
-    const map = new maplibregl.Map({
-      container: mapContainer.current,
-      style: RASTER_STYLE,
-      center: BAYAWAN_CENTER,
+    const map = L.map(containerRef.current, {
+      center: BAYAWAN,
       zoom: 12,
+      scrollWheelZoom: true,
     });
 
-    map.addControl(new maplibregl.NavigationControl(), 'top-left');
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://osm.org/copyright">OSM</a>',
+      maxZoom: 19,
+    }).addTo(map);
+
     mapRef.current = map;
+    geoGroupRef.current = L.layerGroup().addTo(map);
+    dispGroupRef.current = L.layerGroup().addTo(map);
+    dotsGroupRef.current = L.layerGroup().addTo(map);
 
     return () => {
-      markersRef.current.forEach(m => m.remove());
-      markersRef.current = [];
-      linesRef.current.forEach(l => { try { l.remove(); } catch(e) {} });
-      linesRef.current = [];
+      clearLayers();
       map.remove();
       mapRef.current = null;
     };
   }, []);
 
-  // Update markers when data or toggles change
+  // When data or toggles change, try adding markers
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
+    if (!mapRef.current) return;
 
-    // Wait for map to be ready
-    const updateMarkers = () => {
-      // Clear existing markers and lines
-      markersRef.current.forEach(m => m.remove());
-      markersRef.current = [];
-      linesRef.current.forEach(l => { try { l.remove(); } catch(e) {} });
-      linesRef.current = [];
-
-      const allCoords = [];
-
-      // Add geo-tag markers
-      if (showGeo && geoData?.features?.length) {
-        geoData.features.forEach((feature) => {
-          const [lng, lat] = feature.geometry.coordinates;
-          const props = feature.properties;
-          const color = caretakerTypeColors[props.caretaker_type] || '#6b7280';
-          const label = `${props.tag_code || ''} - ${props.caretaker_name || 'Unknown'}`;
-
-          const popup = new maplibregl.Popup({ offset: 15, closeButton: false })
-            .setHTML(`
-              <div style="padding: 8px; min-width: 180px;">
-                <p style="font-weight: 600; margin: 0;">${props.tag_code || ''}</p>
-                <p style="color: #666; margin: 2px 0;">${props.animal_tag || ''} — ${props.species || ''}</p>
-                <p style="color: #666; margin: 2px 0;">Caretaker: ${props.caretaker_name || ''}</p>
-                <p style="color: #888; font-size: 12px;">${caretakerTypeLabels[props.caretaker_type] || ''}</p>
-                ${!props.has_dispersion_link ? '<p style="color: #a855f7; font-size: 11px; font-weight: 500; margin-top: 4px;">⚡ Field-Recorded</p>' : ''}
-              </div>
-            `);
-
-          const marker = new maplibregl.Marker({ element: createMarkerElement(color, label) })
-            .setLngLat([lng, lat])
-            .setPopup(popup)
-            .addTo(map);
-
-          marker.getElement().addEventListener('click', () => {
-            if (props.animal_id) setSelectedAnimalId(props.animal_id);
-            onFeatureClick?.(props, 'geo');
-          });
-
-          markersRef.current.push(marker);
-          allCoords.push([lng, lat]);
-        });
-
-        // Draw line traces for animals with multiple points
-        const animalGroups = {};
-        geoData.features.forEach((f) => {
-          const aid = f.properties.animal_id;
-          if (!animalGroups[aid]) animalGroups[aid] = [];
-          animalGroups[aid].push(f.geometry.coordinates);
-        });
-
-        Object.entries(animalGroups)
-          .filter(([, coords]) => coords.length >= 2)
-          .forEach(([, coords]) => {
-            const line = document.createElement('div');
-            const polyline = new maplibregl.Marker({ element: line, anchor: 'center' })
-              .setLngLat(coords[0]);
-            // Use a canvas overlay for lines instead
-            const canvas = document.createElement('canvas');
-            canvas.style.cssText = 'position: absolute; top: 0; left: 0; pointer-events: none;';
-
-            // Simple line using multiple small markers
-            for (let i = 0; i < coords.length - 1; i++) {
-              const start = coords[i];
-              const end = coords[i + 1];
-              const steps = 5;
-              for (let s = 1; s < steps; s++) {
-                const lng = start[0] + (end[0] - start[0]) * (s / steps);
-                const lat = start[1] + (end[1] - start[1]) * (s / steps);
-                const dot = document.createElement('div');
-                dot.style.cssText = `
-                  width: 6px;
-                  height: 6px;
-                  background: #a855f7;
-                  border-radius: 50%;
-                  opacity: 0.5;
-                `;
-                const dotMarker = new maplibregl.Marker({ element: dot, anchor: 'center' })
-                  .setLngLat([lng, lat])
-                  .addTo(map);
-                markersRef.current.push(dotMarker);
-              }
-            }
-          });
-      }
-
-      // Add dispersal markers
-      if (showDispersal && dispersalData?.features?.length) {
-        dispersalData.features.forEach((feature) => {
-          const [lng, lat] = feature.geometry.coordinates;
-          const props = feature.properties;
-
-          const popup = new maplibregl.Popup({ offset: 15, closeButton: false })
-            .setHTML(`
-              <div style="padding: 8px; min-width: 180px;">
-                <p style="font-weight: 600; margin: 0;">${props.tag_id || ''}</p>
-                <p style="color: #666; margin: 2px 0;">${props.species || ''}</p>
-                <p style="color: #666; margin: 2px 0;">Owner: ${props.beneficiary_name || ''}</p>
-                <p style="color: #888; font-size: 12px;">${props.transfer_type || ''} — ${props.start_date || ''}</p>
-              </div>
-            `);
-
-          const marker = new maplibregl.Marker({
-            element: createMarkerElement('#16a34a', `${props.tag_id || ''} - ${props.beneficiary_name || ''}`)
-          })
-            .setLngLat([lng, lat])
-            .setPopup(popup)
-            .addTo(map);
-
-          marker.getElement().addEventListener('click', () => {
-            if (props.id) setSelectedAnimalId(props.id);
-            onFeatureClick?.(props, 'dispersal');
-          });
-
-          markersRef.current.push(marker);
-          allCoords.push([lng, lat]);
-        });
-      }
-
-      // Fit bounds to show all markers
-      if (allCoords.length > 0) {
-        const bounds = new maplibregl.LngLatBounds();
-        allCoords.forEach(c => bounds.extend(c));
-        map.fitBounds(bounds, { padding: 50, maxZoom: 14 });
-      }
-    };
-
-    // Wait for map to be loaded
-    if (map.isStyleLoaded()) {
-      updateMarkers();
+    if (showGeo) {
+      if (!mapRef.current.hasLayer(geoGroupRef.current)) mapRef.current.addLayer(geoGroupRef.current);
+      if (!mapRef.current.hasLayer(dotsGroupRef.current)) mapRef.current.addLayer(dotsGroupRef.current);
     } else {
-      map.on('load', updateMarkers);
+      if (mapRef.current.hasLayer(geoGroupRef.current)) mapRef.current.removeLayer(geoGroupRef.current);
+      if (mapRef.current.hasLayer(dotsGroupRef.current)) mapRef.current.removeLayer(dotsGroupRef.current);
+    }
+
+    if (showDispersal) {
+      if (!mapRef.current.hasLayer(dispGroupRef.current)) mapRef.current.addLayer(dispGroupRef.current);
+    } else {
+      if (mapRef.current.hasLayer(dispGroupRef.current)) mapRef.current.removeLayer(dispGroupRef.current);
+    }
+
+    // Re-add markers when data changes
+    if (geoData || dispersalData) {
+      addMarkers(mapRef.current, geoData, dispersalData, showGeo, showDispersal);
     }
   }, [geoData, dispersalData, showGeo, showDispersal]);
 
   return (
     <div className="relative">
-      <div ref={mapContainer} style={{ height, width: '100%', borderRadius: '12px', minHeight: '400px' }} />
+      <div ref={containerRef} style={{ height, width: '100%', borderRadius: 12, overflow: 'hidden', minHeight: 400 }} />
 
       {/* Layer toggle panel */}
-      <div className="absolute top-3 right-3 z-[10] bg-white rounded-xl shadow-lg border border-gray-200">
+      <div className="absolute top-3 right-3 z-10 bg-white rounded-xl shadow-lg border border-gray-200">
         <button
           onClick={() => setPanelOpen(!panelOpen)}
           className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 w-full"
@@ -243,57 +223,42 @@ export default function LiveTrackingMapLayer({ filters = {}, height = '500px', o
           Layers
           {panelOpen ? <ChevronUp className="h-3 w-3 ml-auto" /> : <ChevronDown className="h-3 w-3 ml-auto" />}
         </button>
-
         {panelOpen && (
           <div className="px-3 pb-3 space-y-2 border-t border-gray-100 pt-2">
             <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showGeo}
-                onChange={(e) => setShowGeo(e.target.checked)}
-                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-              />
+              <input type="checkbox" checked={showGeo} onChange={e => setShowGeo(e.target.checked)}
+                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500" />
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-full bg-purple-500" />
                 <span className="text-xs font-medium text-gray-700">Geo-Tag Custody</span>
               </div>
             </label>
-
             <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showDispersal}
-                onChange={(e) => setShowDispersal(e.target.checked)}
-                className="rounded border-gray-300 text-green-600 focus:ring-green-500"
-              />
+              <input type="checkbox" checked={showDispersal} onChange={e => setShowDispersal(e.target.checked)}
+                className="rounded border-gray-300 text-green-600 focus:ring-green-500" />
               <div className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-full bg-green-500" />
                 <span className="text-xs font-medium text-gray-700">Dispersal Records</span>
               </div>
             </label>
-
             <div className="pt-2 border-t border-gray-100">
               <p className="text-[10px] font-medium text-gray-400 uppercase mb-1">Caretaker Types</p>
-              {Object.entries(caretakerTypeColors).map(([type, color]) => (
+              {Object.entries(CARETAKER_COLORS).map(([type, color]) => (
                 <div key={type} className="flex items-center gap-1.5 mb-0.5">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
-                  <span className="text-[10px] text-gray-500">{caretakerTypeLabels[type]}</span>
+                  <span className="text-[10px] text-gray-500">{CARETAKER_LABELS[type]}</span>
                 </div>
               ))}
             </div>
-
             <p className="text-[10px] text-gray-400 pt-1">
-              {markersRef.current.length} markers shown
+              {geoLoading || dispLoading ? 'Loading…' : `${markerCount} markers shown`}
             </p>
           </div>
         )}
       </div>
 
       {selectedAnimalId && (
-        <AnimalDetailModal
-          animalId={selectedAnimalId}
-          onClose={() => setSelectedAnimalId(null)}
-        />
+        <AnimalDetailModal animalId={selectedAnimalId} onClose={() => setSelectedAnimalId(null)} />
       )}
     </div>
   );

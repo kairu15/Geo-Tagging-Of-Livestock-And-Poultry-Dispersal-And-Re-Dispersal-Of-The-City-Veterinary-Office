@@ -12,18 +12,31 @@ export function AuthProvider({ children }) {
     refresh: localStorage.getItem('refresh_token'),
   });
 
-  const { data: meData, isLoading, isError } = useMe();
+  const { data: meData, isLoading, isError, error } = useMe();
 
-  // Redirect to /login when auth check fails (401 with no refresh possible)
+  // Derive user and tokens directly from meData and localStorage.
+  // This avoids the useEffect race condition where user isn't set
+  // before ProtectedRoute checks isAuthenticated during render.
+  const currentUser = meData || user;
+  const currentAccess = tokens.access || localStorage.getItem('access_token');
+  const currentRefresh = tokens.refresh || localStorage.getItem('refresh_token');
+
+  // Redirect to /login only after tokens are definitively gone from localStorage
+  // (the interceptor clears them when refresh truly fails)
   useEffect(() => {
-    if (isError && !isLoading && !localStorage.getItem('access_token')) {
+    if (isError && !isLoading && !localStorage.getItem('access_token') && !localStorage.getItem('refresh_token')) {
       navigate('/login', { replace: true });
     }
   }, [isError, isLoading, navigate]);
 
+  // After successful /auth/me, sync tokens from localStorage
+  // (interceptor may have refreshed them)
   useEffect(() => {
     if (meData) {
       setUser(meData);
+      const freshAccess = localStorage.getItem('access_token');
+      const freshRefresh = localStorage.getItem('refresh_token');
+      setTokens({ access: freshAccess, refresh: freshRefresh });
     }
   }, [meData]);
 
@@ -41,15 +54,15 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  const isAuthenticated = !!tokens.access && !!user;
-  const isAdmin = user?.role === 'ADMIN';
-  const isOfficerOrAbove = ['ADMIN', 'OFFICER', 'SUPERVISOR'].includes(user?.role);
-  const isSupervisorOrAbove = ['ADMIN', 'SUPERVISOR'].includes(user?.role);
+  const isAuthenticated = !!currentAccess && !!currentUser;
+  const isAdmin = currentUser?.role === 'ADMIN';
+  const isOfficerOrAbove = ['ADMIN', 'OFFICER', 'SUPERVISOR'].includes(currentUser?.role);
+  const isSupervisorOrAbove = ['ADMIN', 'SUPERVISOR'].includes(currentUser?.role);
 
   return (
     <AuthContext.Provider
       value={{
-        user,
+        user: currentUser,
         isAuthenticated,
         isAdmin,
         isOfficerOrAbove,

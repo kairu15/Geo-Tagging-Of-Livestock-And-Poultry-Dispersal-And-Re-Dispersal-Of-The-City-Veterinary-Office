@@ -19,7 +19,7 @@ export const useMe = () => {
       const res = await api.get('/auth/me/');
       return res.data;
     },
-    retry: false,
+    retry: 1,
     refetchOnWindowFocus: false,
     refetchOnMount: true,
     refetchOnReconnect: false,
@@ -56,7 +56,7 @@ export const useCreateBeneficiary = () => {
 export const useBeneficiaryCurrentHoldings = (id) => {
   return useQuery({
     queryKey: ['beneficiary-holdings', id],
-    queryFn: () => api.get(`/beneficiaries/${id}/current-holdings/`).then((r) => r.data),
+    queryFn: () => api.get(`/beneficiaries/${id}/current_holdings/`).then((r) => r.data),
     enabled: !!id,
   });
 };
@@ -64,7 +64,7 @@ export const useBeneficiaryCurrentHoldings = (id) => {
 export const useBeneficiaryFullHistory = (id) => {
   return useQuery({
     queryKey: ['beneficiary-history', id],
-    queryFn: () => api.get(`/beneficiaries/${id}/full-history/`).then((r) => r.data),
+    queryFn: () => api.get(`/beneficiaries/${id}/full_history/`).then((r) => r.data),
     enabled: !!id,
   });
 };
@@ -106,7 +106,7 @@ export const useAnimalHistory = (id) => {
 export const useAnimalLocationTimeline = (id) => {
   return useQuery({
     queryKey: ['animal-timeline', id],
-    queryFn: () => api.get(`/animals/${id}/location-timeline/`).then((r) => r.data),
+    queryFn: () => api.get(`/animals/${id}/location_timeline/`).then((r) => r.data),
     enabled: !!id,
   });
 };
@@ -189,6 +189,14 @@ export const useActiveAnimalsMap = () => {
   return useQuery({
     queryKey: ['active-animals-map'],
     queryFn: () => api.get('/dispersal/map/active-animals/').then((r) => r.data),
+    staleTime: 30_000,
+  });
+};
+
+export const useActiveAnimalsPaths = () => {
+  return useQuery({
+    queryKey: ['active-animals-paths'],
+    queryFn: () => api.get('/dispersal/map/active-animals/paths/').then((r) => r.data),
     staleTime: 30_000,
   });
 };

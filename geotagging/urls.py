@@ -16,7 +16,13 @@ router.register(r"caretakers", CaretakerViewSet, basename="caretaker")
 router.register(r"handoff-reasons", HandoffReasonViewSet, basename="handoff-reason")
 
 urlpatterns = [
-    path("", include(router.urls)),
+    # Custom action endpoints (MUST come before router to avoid pk conflicts)
+    path("checkins/create/", checkin_view, name="checkin-create"),
+    path("handoff/", handoff_view, name="handoff"),
+
+    # Map endpoints
+    path("map/active/", active_geo_map_view, name="active-geo-map"),
+    path("map/<int:pk>/trail/", custody_trail_view, name="custody-trail"),
 
     # Tag-specific endpoints
     path("tags/<int:pk>/lineage/", tag_lineage_view, name="tag-lineage"),
@@ -24,11 +30,6 @@ urlpatterns = [
     path("tags/<str:tag_code>/lookup/", tag_lookup_view, name="tag-lookup"),
     path("tags/<int:pk>/retire/", retire_tag_view, name="tag-retire"),
 
-    # Custom action endpoints
-    path("checkins/create/", checkin_view, name="checkin-create"),
-    path("handoff/", handoff_view, name="handoff"),
-
-    # Map endpoints
-    path("map/active/", active_geo_map_view, name="active-geo-map"),
-    path("map/<int:pk>/trail/", custody_trail_view, name="custody-trail"),
+    # Router (must come last)
+    path("", include(router.urls)),
 ]

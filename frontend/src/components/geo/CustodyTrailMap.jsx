@@ -1,214 +1,133 @@
-import { useEffect, useRef, useCallback } from 'react';
-import * as maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import { useEffect, useRef } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
-const BAYAWAN_CENTER = [122.8353, 9.6894];
-const RASTER_STYLE = {
-  version: 8,
-  sources: {
-    'osm-raster': {
-      type: 'raster',
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      attribution: '© OpenStreetMap contributors',
-    },
-  },
-  layers: [{ id: 'osm-tiles', type: 'raster', source: 'osm-raster', minzoom: 0, maxzoom: 19 }],
-};
-const DRAW_DURATION = 2000; // ms for line to fully draw
-const TOTAL_DASH = 3000; // large enough to cover any line length in pixels
+const BAYAWAN_CENTER = [9.6894, 122.8353];
+const DRAW_DURATION = 2000;
 
 export default function CustodyTrailMap({ trailData, height = '400px' }) {
-  const mapContainer = useRef(null);
+  const containerRef = useRef(null);
   const mapRef = useRef(null);
-  const animFrameRef = useRef(null);
-
-  const animateLine = useCallback((map) => {
-    if (!map.getLayer('trail-line')) return;
-
-    const startTime = performance.now();
-
-    const step = (now) => {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / DRAW_DURATION, 1);
-      // Ease-out cubic
-      const eased = 1 - Math.pow(1 - progress, 3);
-
-      const drawn = eased * TOTAL_DASH;
-      map.setPaintProperty('trail-line', 'line-dasharray', [drawn, TOTAL_DASH]);
-
-      // Fade in points as line passes them
-      if (map.getLayer('trail-points')) {
-        const pointCount = map.querySourceFeatures('trail', { sourceLayer: '', filter: ['!=', 'type', 'trail'] }).length;
-        // Approximate: reveal points proportionally
-        map.setPaintProperty('trail-points', 'circle-opacity', eased);
-      }
-
-      if (progress < 1) {
-        animFrameRef.current = requestAnimationFrame(step);
-      }
-    };
-
-    animFrameRef.current = requestAnimationFrame(step);
-  }, []);
+  const timerRef = useRef(null);
 
   useEffect(() => {
-    if (!mapContainer.current) return;
+    if (!containerRef.current) return;
 
     const points = trailData?.properties?.points || [];
     if (points.length === 0) return;
 
+    // Wait for container to have dimensions
     const init = () => {
       if (mapRef.current) return;
-      const rect = mapContainer.current?.getBoundingClientRect();
+      const rect = containerRef.current?.getBoundingClientRect();
       if (!rect || rect.width === 0 || rect.height === 0) {
         requestAnimationFrame(init);
         return;
       }
 
-      const map = new maplibregl.Map({
-        container: mapContainer.current,
-        style: RASTER_STYLE,
+      const map = L.map(containerRef.current, {
         center: BAYAWAN_CENTER,
         zoom: 12,
+        scrollWheelZoom: true,
       });
 
-      map.addControl(new maplibregl.NavigationControl(), 'top-left');
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://osm.org/copyright">OSM</a>',
+        maxZoom: 19,
+      }).addTo(map);
+
       mapRef.current = map;
 
-      const addLayers = () => {
-        // Clean up old
-        try {
-          if (map.getLayer('trail-line')) map.removeLayer('trail-line');
-          if (map.getLayer('trail-points')) map.removeLayer('trail-points');
-          if (map.getSource('trail')) map.removeSource('trail');
-        } catch (e) {}
+      // Build coords
+      const latLngs = points.map((p) => [p.latitude, p.longitude]);
 
-        // Build GeoJSON
-        const lineCoords = points.map((p) => [p.longitude, p.latitude]);
-        const pointFeatures = points.map((p, idx) => ({
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates: [p.longitude, p.latitude] },
-          properties: {
-            index: idx,
-            date: p.date,
-            caretaker_name: p.caretaker_name || '',
-            source: p.source || '',
-            type: p.type,
-          },
-        }));
+      // Animated polyline
+      const polyline = L.polyline([], {
+        color: '#16a34a',
+        weight: 3,
+        opacity: 0.85,
+        dashArray: '8, 12',
+        lineCap: 'round',
+        lineJoin: 'round',
+      }).addTo(map);
 
-        const features = [];
-        if (lineCoords.length >= 2) {
-          features.push({
-            type: 'Feature',
-            geometry: { type: 'LineString', coordinates: lineCoords },
-            properties: { type: 'trail' },
-          });
-        }
-        features.push(...pointFeatures);
+      // Start animation
+      const startTime = performance.now();
+      const step = (now) => {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / DRAW_DURATION, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
 
-        map.addSource('trail', {
-          type: 'geojson',
-          data: { type: 'FeatureCollection', features },
-        });
-
-        // Animated line layer — starts hidden
-        if (lineCoords.length >= 2) {
-          map.addLayer({
-            id: 'trail-line',
-            type: 'line',
-            source: 'trail',
-            filter: ['==', 'type', 'trail'],
-            layout: { 'line-join': 'round', 'line-cap': 'round' },
-            paint: {
-              'line-color': '#16a34a',
-              'line-width': 3,
-              'line-opacity': 0.85,
-              'line-dasharray': [0, TOTAL_DASH], // start hidden
-            },
-          });
+        const drawCount = Math.floor(eased * latLngs.length);
+        const pts = latLngs.slice(0, drawCount + 1);
+        if (pts.length >= 2) {
+          polyline.setLatLngs(pts);
         }
 
-        // Points — start invisible, fade in with animation
-        map.addLayer({
-          id: 'trail-points',
-          type: 'circle',
-          source: 'trail',
-          filter: ['!=', 'type', 'trail'],
-          paint: {
-            'circle-radius': [
-              'match', ['get', 'type'],
-              'custody_start', 8,
-              'checkin', 5,
-              5,
-            ],
-            'circle-color': [
-              'match', ['get', 'type'],
-              'custody_start', '#16a34a',
-              'checkin', '#3b82f6',
-              '#6b7280',
-            ],
-            'circle-stroke-color': '#ffffff',
-            'circle-stroke-width': 2,
-            'circle-opacity': 0, // start hidden
-          },
-        });
-
-        // Popup on hover
-        const popup = new maplibregl.Popup({
-          closeButton: false,
-          closeOnClick: false,
-          offset: 12,
-        });
-
-        map.on('mouseenter', 'trail-points', (e) => {
-          map.getCanvas().style.cursor = 'pointer';
-          const feature = e.features[0];
-          const props = feature.properties;
-          let html = '<div class="text-sm">';
-          if (props.type === 'custody_start') {
-            html += `<p class="font-semibold">Custody Start</p>`;
-            html += `<p class="text-gray-600">${props.caretaker_name}</p>`;
-          } else {
-            html += `<p class="font-semibold">Location Check-in</p>`;
-            html += `<p class="text-gray-600">${props.source}</p>`;
-          }
-          html += `<p class="text-gray-500 text-xs mt-1">${props.date}</p>`;
-          html += '</div>';
-          popup.setLngLat(feature.geometry.coordinates).setHTML(html).addTo(map);
-        });
-
-        map.on('mouseleave', 'trail-points', () => {
-          map.getCanvas().style.cursor = '';
-          popup.remove();
-        });
-
-        // Fit bounds
-        const bounds = new maplibregl.LngLatBounds();
-        lineCoords.forEach((c) => bounds.extend(c));
-        map.fitBounds(bounds, { padding: 40 });
-
-        // Start animation after a short delay
-        setTimeout(() => animateLine(map), 300);
+        if (progress < 1) {
+          timerRef.current = requestAnimationFrame(step);
+        }
       };
+      timerRef.current = requestAnimationFrame(step);
 
-      map.on('load', addLayers);
+      // Add points
+      points.forEach((p, idx) => {
+        const isStart = p.type === 'custody_start';
+        const color = isStart ? '#16a34a' : '#3b82f6';
+        const radius = isStart ? 8 : 5;
+
+        const marker = L.circleMarker([p.latitude, p.longitude], {
+          radius,
+          color,
+          fillColor: color,
+          fillOpacity: 0,
+          weight: 2,
+          className: 'trail-point',
+        }).addTo(map);
+
+        // Animate point opacity
+        const pointDelay = (idx / latLngs.length) * DRAW_DURATION;
+        setTimeout(() => {
+          marker.setStyle({ fillOpacity: 1 });
+        }, pointDelay + 300);
+
+        // Popup
+        let popupHtml = '<div class="text-sm" style="padding:4px">';
+        if (isStart) {
+          popupHtml += `<p style="font-weight:600">Custody Start</p>`;
+          popupHtml += `<p style="color:#666">${p.caretaker_name || ''}</p>`;
+        } else {
+          popupHtml += `<p style="font-weight:600">Location Check-in</p>`;
+          popupHtml += `<p style="color:#666">${p.source || ''}</p>`;
+        }
+        popupHtml += `<p style="color:#888;font-size:11px;margin-top:4px">${p.date || ''}</p>`;
+        popupHtml += '</div>';
+
+        marker.bindPopup(popupHtml, { closeButton: false, offset: [0, -8] });
+
+        marker.on('mouseover', function () { this.openPopup(); });
+        marker.on('mouseout', function () { this.closePopup(); });
+      });
+
+      // Fit bounds
+      if (latLngs.length > 0) {
+        map.fitBounds(L.latLngBounds(latLngs), { padding: [40, 40] });
+      }
     };
 
-    const timer = setTimeout(init, 100);
+    timerRef.current = setTimeout(init, 100);
 
     return () => {
-      clearTimeout(timer);
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      clearTimeout(timerRef.current);
+      if (timerRef.current) cancelAnimationFrame(timerRef.current);
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [trailData, animateLine]);
+  }, [trailData]);
 
   return (
     <div
-      ref={mapContainer}
+      ref={containerRef}
       style={{ height, borderRadius: '12px', overflow: 'hidden', minHeight: '300px' }}
     />
   );

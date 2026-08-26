@@ -1,18 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { ArrowRightLeft, MapPin, CheckCircle, AlertCircle } from 'lucide-react';
+import { ArrowRightLeft, CheckCircle, AlertCircle } from 'lucide-react';
 import {
   useGeoTags, useCaretakers, useHandoffReasons, useHandoffCustodianship,
   useBarangays,
 } from '../api/hooks';
 import { useToast } from '../components/ui/Toast';
-import * as maplibregl from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
-
-const BAYAWAN_CENTER = [122.8353, 9.6894];
-
-
+import MapPicker from '../components/map/MapPicker';
 
 export default function HandoffPage() {
   const navigate = useNavigate();
@@ -317,59 +312,6 @@ export default function HandoffPage() {
           </button>
         </div>
       </form>
-    </div>
-  );
-}
-
-function MapPicker({ position, setPosition, label = 'Pin Location', hint = 'Click on the map to set the location' }) {
-  const mapContainer = useRef(null);
-  const mapRef = useRef(null);
-  const markerRef = useRef(null);
-
-  useEffect(() => {
-    if (!mapContainer.current || mapRef.current) return;
-
-    const map = new maplibregl.Map({
-      container: mapContainer.current,
-      style: {
-        version: 8,
-        sources: { 'osm': { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256 } },
-        layers: [{ id: 'osm-tiles', type: 'raster', source: 'osm' }],
-      },
-      center: position || BAYAWAN_CENTER,
-      zoom: 12,
-    });
-    map.addControl(new maplibregl.NavigationControl(), 'top-left');
-    mapRef.current = map;
-
-    map.on('click', (e) => {
-      const { lng, lat } = e.lngLat;
-      setPosition([lat, lng]);
-      if (markerRef.current) markerRef.current.remove();
-      markerRef.current = new maplibregl.Marker({ color: '#16a34a' })
-        .setLngLat([lng, lat])
-        .addTo(map);
-    });
-
-    return () => {
-      map.remove();
-      mapRef.current = null;
-    };
-  }, []);
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
-      <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2 flex items-center gap-2">
-        <MapPin className="h-4 w-4 text-green-600" />
-        {label}
-      </h2>
-      <p className="text-xs text-gray-400 mb-4">{hint}</p>
-      <div ref={mapContainer} style={{ height: '300px', borderRadius: '12px', overflow: 'hidden' }} />
-      {position && (
-        <p className="text-xs text-gray-500 mt-2">
-          Selected: {position[0].toFixed(6)}, {position[1].toFixed(6)}
-        </p>
-      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@ from .views import (
     OwnershipRecordViewSet, TransferReasonViewSet,
     ReDispersalRequestViewSet,
     disperse_view, redisperse_view, return_to_cvo_view,
-    active_animals_map,
+    active_animals_map, active_animals_paths,
     dispersal_summary_view, redispersal_frequency_view,
 )
 
@@ -21,6 +21,7 @@ urlpatterns = [
     path("return-to-cvo/", return_to_cvo_view, name="return-to-cvo"),
     # Map endpoint
     path("map/active-animals/", active_animals_map, name="active-animals-map"),
+    path("map/active-animals/paths/", active_animals_paths, name="active-animals-paths"),
     # Reports
     path("reports/dispersal-summary/", dispersal_summary_view, name="dispersal-summary"),
     path("reports/redispersal-frequency/", redispersal_frequency_view, name="redispersal-frequency"),
