@@ -1,22 +1,30 @@
-import { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
+import { useEffect, useRef, useState } from 'react';
+import * as maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { useActiveGeoMap, useActiveAnimalsMap } from '../../api/hooks';
-import { Layers, ChevronDown, ChevronUp } from 'lucide-react';
+import { Layers, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
+import AnimalDetailModal from '../AnimalDetailModal';
 
-// Fix default marker icon
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-});
+const BAYAWAN_CENTER = [122.8353, 9.6894];
+
+const RASTER_STYLE = {
+  version: 8,
+  sources: {
+    'osm-raster': {
+      type: 'raster',
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors',
+    },
+  },
+  layers: [{ id: 'osm-tiles', type: 'raster', source: 'osm-raster', minzoom: 0, maxzoom: 19 }],
+};
 
 const caretakerTypeColors = {
-  FORMAL_BENEFICIARY: '#3b82f6',     // blue
-  INFORMAL_CARETAKER: '#a855f7',     // purple
-  TEMPORARY_FOSTER: '#eab308',       // yellow
-  CVO_HOLDING_FACILITY: '#6b7280',   // gray
+  FORMAL_BENEFICIARY: '#3b82f6',
+  INFORMAL_CARETAKER: '#a855f7',
+  TEMPORARY_FOSTER: '#eab308',
+  CVO_HOLDING_FACILITY: '#6b7280',
 };
 
 const caretakerTypeLabels = {
@@ -26,143 +34,207 @@ const caretakerTypeLabels = {
   CVO_HOLDING_FACILITY: 'CVO Facility',
 };
 
-function FitAllBounds({ geoData, dispersalData, showGeo, showDispersal }) {
-  const map = useMap();
-
-  useEffect(() => {
-    const points = [];
-    if (showGeo && geoData?.features) {
-      geoData.features.forEach((f) => {
-        if (f.geometry?.coordinates) {
-          points.push([f.geometry.coordinates[1], f.geometry.coordinates[0]]);
-        }
-      });
-    }
-    if (showDispersal && dispersalData?.features) {
-      dispersalData.features.forEach((f) => {
-        if (f.geometry?.coordinates) {
-          points.push([f.geometry.coordinates[1], f.geometry.coordinates[0]]);
-        }
-      });
-    }
-    if (points.length > 0) {
-      map.fitBounds(L.latLngBounds(points), { padding: [30, 30] });
-    }
-  }, [map, geoData, dispersalData, showGeo, showDispersal]);
-
-  return null;
+function createMarkerElement(color, label) {
+  const el = document.createElement('div');
+  el.style.cssText = `
+    width: 24px;
+    height: 24px;
+    background: ${color};
+    border: 3px solid white;
+    border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    cursor: pointer;
+    transition: transform 0.2s;
+  `;
+  el.onmouseenter = () => { el.style.transform = 'scale(1.3)'; };
+  el.onmouseleave = () => { el.style.transform = 'scale(1)'; };
+  el.title = label;
+  return el;
 }
 
 export default function LiveTrackingMapLayer({ filters = {}, height = '500px', onFeatureClick }) {
+  const mapContainer = useRef(null);
+  const mapRef = useRef(null);
+  const markersRef = useRef([]);
+  const linesRef = useRef([]);
+  const [selectedAnimalId, setSelectedAnimalId] = useState(null);
+  const [panelOpen, setPanelOpen] = useState(true);
   const [showGeo, setShowGeo] = useState(true);
   const [showDispersal, setShowDispersal] = useState(true);
-  const [panelOpen, setPanelOpen] = useState(true);
 
   const { data: geoData } = useActiveGeoMap(filters);
   const { data: dispersalData } = useActiveAnimalsMap();
 
-  const center = [9.6894, 122.8353]; // Bayawan City, Negros Oriental
+  // Initialize map once
+  useEffect(() => {
+    if (mapRef.current || !mapContainer.current) return;
 
-  const geoFeatures = showGeo ? (geoData?.features || []) : [];
-  const dispersalFeatures = showDispersal ? (dispersalData?.features || []) : [];
+    const map = new maplibregl.Map({
+      container: mapContainer.current,
+      style: RASTER_STYLE,
+      center: BAYAWAN_CENTER,
+      zoom: 12,
+    });
 
-  return (
-    <div className="relative">
-      <MapContainer
-        center={center}
-        zoom={10}
-        style={{ height, width: '100%', borderRadius: '12px' }}
-        scrollWheelZoom={true}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+    map.addControl(new maplibregl.NavigationControl(), 'top-left');
+    mapRef.current = map;
 
-        <FitAllBounds
-          geoData={geoData}
-          dispersalData={dispersalData}
-          showGeo={showGeo}
-          showDispersal={showDispersal}
-        />
+    return () => {
+      markersRef.current.forEach(m => m.remove());
+      markersRef.current = [];
+      linesRef.current.forEach(l => { try { l.remove(); } catch(e) {} });
+      linesRef.current = [];
+      map.remove();
+      mapRef.current = null;
+    };
+  }, []);
 
-        {/* Geo-tag custodianship markers (colored by caretaker type) */}
-        {geoFeatures.map((feature, idx) => {
+  // Update markers when data or toggles change
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Wait for map to be ready
+    const updateMarkers = () => {
+      // Clear existing markers and lines
+      markersRef.current.forEach(m => m.remove());
+      markersRef.current = [];
+      linesRef.current.forEach(l => { try { l.remove(); } catch(e) {} });
+      linesRef.current = [];
+
+      const allCoords = [];
+
+      // Add geo-tag markers
+      if (showGeo && geoData?.features?.length) {
+        geoData.features.forEach((feature) => {
           const [lng, lat] = feature.geometry.coordinates;
           const props = feature.properties;
           const color = caretakerTypeColors[props.caretaker_type] || '#6b7280';
+          const label = `${props.tag_code || ''} - ${props.caretaker_name || 'Unknown'}`;
 
-          return (
-            <CircleMarker
-              key={`geo-${idx}`}
-              center={[lat, lng]}
-              radius={8}
-              fillColor={color}
-              fillOpacity={0.8}
-              color="white"
-              weight={2}
-              eventHandlers={{
-                click: () => onFeatureClick?.(props, 'geo'),
-              }}
-            >
-              <Popup>
-                <div className="text-sm min-w-[200px]">
-                  <p className="font-semibold text-gray-900">{props.tag_code}</p>
-                  <p className="text-gray-600">{props.animal_tag} — {props.species}</p>
-                  <p className="text-gray-600">Caretaker: {props.caretaker_name}</p>
-                  <p className="text-gray-500 text-xs">
-                    {caretakerTypeLabels[props.caretaker_type] || props.caretaker_type}
-                  </p>
-                  {props.barangay && (
-                    <p className="text-gray-500 text-xs">{props.barangay}</p>
-                  )}
-                  {!props.has_dispersion_link && (
-                    <p className="text-purple-600 text-xs font-medium mt-1">⚡ Field-Recorded / Unofficial</p>
-                  )}
-                </div>
-              </Popup>
-            </CircleMarker>
-          );
-        })}
+          const popup = new maplibregl.Popup({ offset: 15, closeButton: false })
+            .setHTML(`
+              <div style="padding: 8px; min-width: 180px;">
+                <p style="font-weight: 600; margin: 0;">${props.tag_code || ''}</p>
+                <p style="color: #666; margin: 2px 0;">${props.animal_tag || ''} — ${props.species || ''}</p>
+                <p style="color: #666; margin: 2px 0;">Caretaker: ${props.caretaker_name || ''}</p>
+                <p style="color: #888; font-size: 12px;">${caretakerTypeLabels[props.caretaker_type] || ''}</p>
+                ${!props.has_dispersion_link ? '<p style="color: #a855f7; font-size: 11px; font-weight: 500; margin-top: 4px;">⚡ Field-Recorded</p>' : ''}
+              </div>
+            `);
 
-        {/* Dispersal markers (green) */}
-        {dispersalFeatures.map((feature, idx) => {
+          const marker = new maplibregl.Marker({ element: createMarkerElement(color, label) })
+            .setLngLat([lng, lat])
+            .setPopup(popup)
+            .addTo(map);
+
+          marker.getElement().addEventListener('click', () => {
+            if (props.animal_id) setSelectedAnimalId(props.animal_id);
+            onFeatureClick?.(props, 'geo');
+          });
+
+          markersRef.current.push(marker);
+          allCoords.push([lng, lat]);
+        });
+
+        // Draw line traces for animals with multiple points
+        const animalGroups = {};
+        geoData.features.forEach((f) => {
+          const aid = f.properties.animal_id;
+          if (!animalGroups[aid]) animalGroups[aid] = [];
+          animalGroups[aid].push(f.geometry.coordinates);
+        });
+
+        Object.entries(animalGroups)
+          .filter(([, coords]) => coords.length >= 2)
+          .forEach(([, coords]) => {
+            const line = document.createElement('div');
+            const polyline = new maplibregl.Marker({ element: line, anchor: 'center' })
+              .setLngLat(coords[0]);
+            // Use a canvas overlay for lines instead
+            const canvas = document.createElement('canvas');
+            canvas.style.cssText = 'position: absolute; top: 0; left: 0; pointer-events: none;';
+
+            // Simple line using multiple small markers
+            for (let i = 0; i < coords.length - 1; i++) {
+              const start = coords[i];
+              const end = coords[i + 1];
+              const steps = 5;
+              for (let s = 1; s < steps; s++) {
+                const lng = start[0] + (end[0] - start[0]) * (s / steps);
+                const lat = start[1] + (end[1] - start[1]) * (s / steps);
+                const dot = document.createElement('div');
+                dot.style.cssText = `
+                  width: 6px;
+                  height: 6px;
+                  background: #a855f7;
+                  border-radius: 50%;
+                  opacity: 0.5;
+                `;
+                const dotMarker = new maplibregl.Marker({ element: dot, anchor: 'center' })
+                  .setLngLat([lng, lat])
+                  .addTo(map);
+                markersRef.current.push(dotMarker);
+              }
+            }
+          });
+      }
+
+      // Add dispersal markers
+      if (showDispersal && dispersalData?.features?.length) {
+        dispersalData.features.forEach((feature) => {
           const [lng, lat] = feature.geometry.coordinates;
           const props = feature.properties;
 
-          return (
-            <CircleMarker
-              key={`disp-${idx}`}
-              center={[lat, lng]}
-              radius={8}
-              fillColor="#16a34a"
-              fillOpacity={0.8}
-              color="white"
-              weight={2}
-              eventHandlers={{
-                click: () => onFeatureClick?.(props, 'dispersal'),
-              }}
-            >
-              <Popup>
-                <div className="text-sm min-w-[200px]">
-                  <p className="font-semibold text-gray-900">{props.tag_id}</p>
-                  <p className="text-gray-600">{props.species}</p>
-                  <p className="text-gray-600">Owner: {props.beneficiary_name}</p>
-                  <p className="text-gray-500 text-xs">
-                    {props.transfer_type} — {props.start_date}
-                  </p>
-                  {props.barangay && (
-                    <p className="text-gray-500 text-xs">{props.barangay}</p>
-                  )}
-                </div>
-              </Popup>
-            </CircleMarker>
-          );
-        })}
-      </MapContainer>
+          const popup = new maplibregl.Popup({ offset: 15, closeButton: false })
+            .setHTML(`
+              <div style="padding: 8px; min-width: 180px;">
+                <p style="font-weight: 600; margin: 0;">${props.tag_id || ''}</p>
+                <p style="color: #666; margin: 2px 0;">${props.species || ''}</p>
+                <p style="color: #666; margin: 2px 0;">Owner: ${props.beneficiary_name || ''}</p>
+                <p style="color: #888; font-size: 12px;">${props.transfer_type || ''} — ${props.start_date || ''}</p>
+              </div>
+            `);
+
+          const marker = new maplibregl.Marker({
+            element: createMarkerElement('#16a34a', `${props.tag_id || ''} - ${props.beneficiary_name || ''}`)
+          })
+            .setLngLat([lng, lat])
+            .setPopup(popup)
+            .addTo(map);
+
+          marker.getElement().addEventListener('click', () => {
+            if (props.id) setSelectedAnimalId(props.id);
+            onFeatureClick?.(props, 'dispersal');
+          });
+
+          markersRef.current.push(marker);
+          allCoords.push([lng, lat]);
+        });
+      }
+
+      // Fit bounds to show all markers
+      if (allCoords.length > 0) {
+        const bounds = new maplibregl.LngLatBounds();
+        allCoords.forEach(c => bounds.extend(c));
+        map.fitBounds(bounds, { padding: 50, maxZoom: 14 });
+      }
+    };
+
+    // Wait for map to be loaded
+    if (map.isStyleLoaded()) {
+      updateMarkers();
+    } else {
+      map.on('load', updateMarkers);
+    }
+  }, [geoData, dispersalData, showGeo, showDispersal]);
+
+  return (
+    <div className="relative">
+      <div ref={mapContainer} style={{ height, width: '100%', borderRadius: '12px', minHeight: '400px' }} />
 
       {/* Layer toggle panel */}
-      <div className="absolute top-3 right-3 z-[1000] bg-white rounded-xl shadow-lg border border-gray-200">
+      <div className="absolute top-3 right-3 z-[10] bg-white rounded-xl shadow-lg border border-gray-200">
         <button
           onClick={() => setPanelOpen(!panelOpen)}
           className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 w-full"
@@ -174,7 +246,6 @@ export default function LiveTrackingMapLayer({ filters = {}, height = '500px', o
 
         {panelOpen && (
           <div className="px-3 pb-3 space-y-2 border-t border-gray-100 pt-2">
-            {/* Geo-tag layer */}
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -188,7 +259,6 @@ export default function LiveTrackingMapLayer({ filters = {}, height = '500px', o
               </div>
             </label>
 
-            {/* Dispersal layer */}
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -202,7 +272,6 @@ export default function LiveTrackingMapLayer({ filters = {}, height = '500px', o
               </div>
             </label>
 
-            {/* Legend */}
             <div className="pt-2 border-t border-gray-100">
               <p className="text-[10px] font-medium text-gray-400 uppercase mb-1">Caretaker Types</p>
               {Object.entries(caretakerTypeColors).map(([type, color]) => (
@@ -212,9 +281,20 @@ export default function LiveTrackingMapLayer({ filters = {}, height = '500px', o
                 </div>
               ))}
             </div>
+
+            <p className="text-[10px] text-gray-400 pt-1">
+              {markersRef.current.length} markers shown
+            </p>
           </div>
         )}
       </div>
+
+      {selectedAnimalId && (
+        <AnimalDetailModal
+          animalId={selectedAnimalId}
+          onClose={() => setSelectedAnimalId(null)}
+        />
+      )}
     </div>
   );
 }

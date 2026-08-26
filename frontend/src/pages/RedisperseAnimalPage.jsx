@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useAnimals, useBeneficiaries, useTransferReasons, useRedisperseAnimal } from '../api/hooks';
+import { useToast } from '../components/ui/Toast';
 import { ArrowLeftRight, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function RedisperseAnimalPage() {
   const navigate = useNavigate();
+  const toast = useToast();
   const redisperseMutation = useRedisperseAnimal();
   const [step, setStep] = useState(1);
   const [selectedAnimal, setSelectedAnimal] = useState(null);
@@ -47,9 +49,10 @@ export default function RedisperseAnimalPage() {
         offspring_count_returned: parseInt(data.offspring_count_returned) || 0,
         start_date: data.start_date,
       });
+      toast.success('Animal re-dispersed successfully!');
       navigate('/animals');
     } catch (err) {
-      // Error handled by mutation
+      toast.error(err.response?.data?.error || 'Re-dispersal failed.');
     }
   };
 

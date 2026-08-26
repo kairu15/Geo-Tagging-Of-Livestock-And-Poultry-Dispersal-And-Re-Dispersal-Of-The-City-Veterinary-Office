@@ -1,27 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Tag, MapPin, CheckCircle, AlertCircle } from 'lucide-react';
 import { useTagAnimal, useAnimals, useCaretakers, useBarangays } from '../api/hooks';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
+import { useToast } from '../components/ui/Toast';
+import * as maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
-// Fix default marker icon
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-});
-
-function LocationPicker({ position, setPosition }) {
-  useMapEvents({
-    click(e) {
-      setPosition([e.latlng.lat, e.latlng.lng]);
-    },
-  });
-  return position ? <Marker position={position} /> : null;
-}
+const BAYAWAN_CENTER = [122.8353, 9.6894];
 
 export default function TagAnimalPage() {
   const navigate = useNavigate();
@@ -29,6 +15,7 @@ export default function TagAnimalPage() {
   const [useExistingCaretaker, setUseExistingCaretaker] = useState(true);
   const [success, setSuccess] = useState(null);
 
+  const toast = useToast();
   const tagAnimal = useTagAnimal();
   const { data: animalsData } = useAnimals({ current_status: 'AVAILABLE' });
   const { data: caretakersData } = useCaretakers();
@@ -62,7 +49,7 @@ export default function TagAnimalPage() {
       const result = await tagAnimal.mutateAsync(payload);
       setSuccess(result);
     } catch (err) {
-      // Error handled by mutation
+      toast.error(err.response?.data?.error || 'Failed to tag animal.');
     }
   };
 
@@ -280,32 +267,7 @@ export default function TagAnimalPage() {
         </div>
 
         {/* Location Pin */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2 flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-green-600" />
-            Pin Location
-          </h2>
-          <p className="text-xs text-gray-400 mb-4">Click on the map to set the tagging location</p>
-          <div style={{ height: '300px', borderRadius: '12px', overflow: 'hidden' }}>
-            <MapContainer
-              center={[9.6894, 122.8353]}
-              zoom={10}
-              style={{ height: '100%', width: '100%' }}
-              scrollWheelZoom={true}
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              <LocationPicker position={position} setPosition={setPosition} />
-            </MapContainer>
-          </div>
-          {position && (
-            <p className="text-xs text-gray-500 mt-2">
-              Selected: {position[0].toFixed(6)}, {position[1].toFixed(6)}
-            </p>
-          )}
-        </div>
+        <MapPicker position={position} setPosition={setPosition} />
 
         {/* Submit */}
         <div className="flex justify-end gap-3">
@@ -325,6 +287,59 @@ export default function TagAnimalPage() {
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function MapPicker({ position, setPosition }) {
+  const mapContainer = useRef(null);
+  const mapRef = useRef(null);
+  const markerRef = useRef(null);
+
+  useEffect(() => {
+    if (!mapContainer.current || mapRef.current) return;
+
+    const map = new maplibregl.Map({
+      container: mapContainer.current,
+      style: {
+        version: 8,
+        sources: { 'osm': { type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256 } },
+        layers: [{ id: 'osm-tiles', type: 'raster', source: 'osm' }],
+      },
+      center: position || BAYAWAN_CENTER,
+      zoom: 12,
+    });
+    map.addControl(new maplibregl.NavigationControl(), 'top-left');
+    mapRef.current = map;
+
+    map.on('click', (e) => {
+      const { lng, lat } = e.lngLat;
+      setPosition([lat, lng]);
+      if (markerRef.current) markerRef.current.remove();
+      markerRef.current = new maplibregl.Marker({ color: '#16a34a' })
+        .setLngLat([lng, lat])
+        .addTo(map);
+    });
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, []);
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2 flex items-center gap-2">
+        <MapPin className="h-4 w-4 text-green-600" />
+        Pin Location
+      </h2>
+      <p className="text-xs text-gray-400 mb-4">Click on the map to set the tagging location</p>
+      <div ref={mapContainer} style={{ height: '300px', borderRadius: '12px', overflow: 'hidden' }} />
+      {position && (
+        <p className="text-xs text-gray-500 mt-2">
+          Selected: {position[0].toFixed(6)}, {position[1].toFixed(6)}
+        </p>
+      )}
     </div>
   );
 }

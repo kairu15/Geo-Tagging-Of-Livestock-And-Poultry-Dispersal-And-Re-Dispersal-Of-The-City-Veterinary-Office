@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useDispersalSummary, useRedispersalFrequency, useSpecies, useBarangays } from '../api/hooks';
+import api from '../api/axios';
 import { FileBarChart, Download, AlertTriangle, TrendingUp } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const COLORS = ['#16a34a', '#2563eb', '#eab308', '#dc2626', '#8b5cf6', '#06b6d4'];
 
@@ -24,12 +25,44 @@ export default function ReportsPage() {
     });
   };
 
+  const handleExportCSV = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (filters.date_from) params.set('date_from', filters.date_from);
+      if (filters.date_to) params.set('date_to', filters.date_to);
+      if (filters.species) params.set('species', filters.species);
+      if (filters.barangay) params.set('barangay', filters.barangay);
+
+      const res = await api.get(`/reports/dispersal-export/?${params.toString()}`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'dispersal_report.csv');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error('Export failed:', err);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-        <FileBarChart className="h-6 w-6 text-green-600" />
-        Reports & Analytics
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <FileBarChart className="h-6 w-6 text-green-600" />
+          Reports & Analytics
+        </h1>
+        <button
+          onClick={handleExportCSV}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+        >
+          <Download className="h-4 w-4" />
+          Export CSV
+        </button>
+      </div>
 
       {/* Filters */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">

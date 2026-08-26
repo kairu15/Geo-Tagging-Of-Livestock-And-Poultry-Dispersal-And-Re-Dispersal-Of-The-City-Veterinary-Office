@@ -2,20 +2,21 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Filter, RefreshCw } from 'lucide-react';
 import LiveTrackingMapLayer from '../components/geo/LiveTrackingMapLayer';
+import AnimalDetailModal from '../components/AnimalDetailModal';
 import { useSpecies, useBarangays } from '../api/hooks';
 
 export default function GeoTagMapPage() {
   const navigate = useNavigate();
   const [filters, setFilters] = useState({});
+  const [selectedAnimalId, setSelectedAnimalId] = useState(null);
   const { data: species } = useSpecies();
   const { data: barangays } = useBarangays();
 
   const handleFeatureClick = (props, type) => {
     if (type === 'geo' && props.geo_tag_id) {
       navigate(`/geo-tracking/profile/${props.geo_tag_id}`);
-    } else if (type === 'dispersal' && props.id) {
-      navigate(`/animals/${props.id}`);
     }
+    // Dispersal features are handled by the modal in LiveTrackingMapLayer
   };
 
   return (
@@ -117,6 +118,14 @@ export default function GeoTagMapPage() {
           onFeatureClick={handleFeatureClick}
         />
       </div>
+
+      {/* Animal Detail Modal */}
+      {selectedAnimalId && (
+        <AnimalDetailModal
+          animalId={selectedAnimalId}
+          onClose={() => setSelectedAnimalId(null)}
+        />
+      )}
     </div>
   );
 }

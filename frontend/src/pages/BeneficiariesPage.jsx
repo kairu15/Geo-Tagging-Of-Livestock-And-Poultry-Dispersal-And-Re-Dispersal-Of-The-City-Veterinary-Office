@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom';
 import { useBeneficiaries, useBarangays } from '../api/hooks';
 import { Plus, Search, Users, ChevronDown } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import BeneficiaryDetailModal from '../components/BeneficiaryDetailModal';
 
 export default function BeneficiariesPage() {
   const [search, setSearch] = useState('');
   const [barangayFilter, setBarangayFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [selectedBeneficiaryId, setSelectedBeneficiaryId] = useState(null);
   const { isOfficerOrAbove } = useAuth();
 
   const params = {};
@@ -80,10 +82,10 @@ export default function BeneficiariesPage() {
           </div>
         ) : (
           beneficiaries.map((b) => (
-            <Link
+            <div
               key={b.id}
-              to={`/beneficiaries/${b.id}`}
-              className="bg-white rounded-xl border border-gray-200 p-5 hover:border-green-300 hover:shadow-sm transition-all"
+              onClick={() => setSelectedBeneficiaryId(b.id)}
+              className="bg-white rounded-xl border border-gray-200 p-5 hover:border-green-300 hover:shadow-sm transition-all cursor-pointer"
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -107,10 +109,18 @@ export default function BeneficiariesPage() {
                   📍 {Number(b.latitude).toFixed(4)}, {Number(b.longitude).toFixed(4)}
                 </p>
               )}
-            </Link>
+            </div>
           ))
         )}
       </div>
+
+      {/* Detail Modal */}
+      {selectedBeneficiaryId && (
+        <BeneficiaryDetailModal
+          beneficiaryId={selectedBeneficiaryId}
+          onClose={() => setSelectedBeneficiaryId(null)}
+        />
+      )}
     </div>
   );
 }

@@ -38,7 +38,7 @@ export default function AnimalRegistrationPage() {
       const result = await createMutation.mutateAsync(payload);
       navigate(`/animals/${result.data.id}`);
     } catch (err) {
-      // Error handled by mutation
+      toast.error(err.response?.data?.detail || 'Registration failed. Please check your inputs.');
     }
   };
 

@@ -17,6 +17,7 @@ import DisperseAnimalPage from './pages/DisperseAnimalPage';
 import RedisperseAnimalPage from './pages/RedisperseAnimalPage';
 import ReportsPage from './pages/ReportsPage';
 import AnimalRegistrationPage from './pages/AnimalRegistrationPage';
+import SpeciesManagementPage from './pages/SpeciesManagementPage';
 import GeoTagMapPage from './pages/GeoTagMapPage';
 import AnimalGeoProfilePage from './pages/AnimalGeoProfilePage';
 import TagAnimalPage from './pages/TagAnimalPage';
@@ -73,6 +74,11 @@ export default function App() {
                 }
               />
               <Route path="reports" element={<ReportsPage />} />
+              <Route path="species" element={
+                <ProtectedRoute requiredRole={['ADMIN', 'OFFICER', 'SUPERVISOR']}>
+                  <SpeciesManagementPage />
+                </ProtectedRoute>
+              } />
               {/* Geo-Tagging routes */}
               <Route path="geo-tracking/map" element={<GeoTagMapPage />} />
               <Route path="geo-tracking/profile/:id" element={<AnimalGeoProfilePage />} />

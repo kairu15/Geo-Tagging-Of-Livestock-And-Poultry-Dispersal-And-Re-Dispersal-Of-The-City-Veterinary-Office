@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAnimals, useSpecies } from '../api/hooks';
 import { Plus, Search, Filter, Beef, ChevronDown } from 'lucide-react';
+import AnimalDetailModal from '../components/AnimalDetailModal';
 
 const statusColors = {
   AVAILABLE: 'bg-green-100 text-green-800',
@@ -17,6 +18,7 @@ export default function AnimalsListPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [speciesFilter, setSpeciesFilter] = useState('');
+  const [selectedAnimalId, setSelectedAnimalId] = useState(null);
 
   const params = {};
   if (search) params.search = search;
@@ -130,12 +132,12 @@ export default function AnimalsListPage() {
                       {animal.is_batch ? `${animal.batch_quantity} heads` : '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Link
-                        to={`/animals/${animal.id}`}
+                      <button
+                        onClick={() => setSelectedAnimalId(animal.id)}
                         className="text-green-600 hover:text-green-800 font-medium text-xs"
                       >
                         View
-                      </Link>
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -150,6 +152,14 @@ export default function AnimalsListPage() {
         <div className="text-center text-sm text-gray-500">
           Showing {animals.length} of {data.count} animals
         </div>
+      )}
+
+      {/* Detail Modal */}
+      {selectedAnimalId && (
+        <AnimalDetailModal
+          animalId={selectedAnimalId}
+          onClose={() => setSelectedAnimalId(null)}
+        />
       )}
     </div>
   );

@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Beef, Users, Handshake, ArrowLeftRight,
   FileBarChart, LogOut, Menu, X, MapPin, Satellite, Tag,
-  ArrowRightLeft, ClipboardCheck, QrCode
+  ArrowRightLeft, ClipboardCheck, QrCode, Bird
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -14,6 +14,7 @@ const navItems = [
   { path: '/dispersal', label: 'Disperse', icon: Handshake, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
   { path: '/redispersal', label: 'Re-Disperse', icon: ArrowLeftRight, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
   { path: '/reports', label: 'Reports', icon: FileBarChart },
+  { path: '/species', label: 'Species & Breeds', icon: Bird, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
   // Geo-Tagging section
   { path: '/geo-tracking/map', label: 'Tracking Map', icon: Satellite, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
   { path: '/geo-tracking/lookup', label: 'Tag Lookup', icon: QrCode },

@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useAnimals, useBeneficiaries, useDisperseAnimal } from '../api/hooks';
+import { useToast } from '../components/ui/Toast';
 import { Handshake, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function DisperseAnimalPage() {
   const navigate = useNavigate();
+  const toast = useToast();
   const disperseMutation = useDisperseAnimal();
   const [step, setStep] = useState(1);
   const [selectedAnimal, setSelectedAnimal] = useState(null);
@@ -39,9 +41,10 @@ export default function DisperseAnimalPage() {
         condition_at_transfer: data.condition_at_transfer,
         start_date: data.start_date,
       });
+      toast.success('Animal dispersed successfully!');
       navigate('/animals');
     } catch (err) {
-      // Error handled by mutation
+      toast.error(err.response?.data?.error || 'Dispersal failed. Please try again.');
     }
   };
 

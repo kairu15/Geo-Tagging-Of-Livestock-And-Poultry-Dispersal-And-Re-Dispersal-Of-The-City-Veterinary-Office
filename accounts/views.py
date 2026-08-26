@@ -61,3 +61,24 @@ def login_view(request):
 def me_view(request):
     """Return the currently authenticated user's profile."""
     return Response(UserSerializer(request.user).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAdmin])
+def reset_password_view(request, pk):
+    """Admin can reset a user's password."""
+    try:
+        user = User.objects.get(pk=pk)
+    except User.DoesNotExist:
+        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    new_password = request.data.get("new_password")
+    if not new_password or len(new_password) < 6:
+        return Response(
+            {"error": "Password must be at least 6 characters"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    user.set_password(new_password)
+    user.save()
+    return Response({"message": f"Password reset for {user.username}"})
