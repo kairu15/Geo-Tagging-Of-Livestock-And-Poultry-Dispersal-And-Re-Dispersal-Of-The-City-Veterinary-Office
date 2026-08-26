@@ -17,7 +17,7 @@ from .services import (
     retire_tag, get_custody_lineage, get_active_geo_locations, get_custody_trail,
     GeoDomainError,
 )
-from accounts.permissions import IsOfficerOrAbove, IsReadOnly
+from accounts.permissions import IsOfficerOrAbove, IsReadOnly, IsAuthenticatedAndNotReadOnly
 from livestock.models import Animal
 from beneficiaries.models import Beneficiary
 
@@ -212,7 +212,7 @@ def tag_lookup_view(request, tag_code):
 
 
 @api_view(["POST"])
-@perm_decorator([IsOfficerOrAbove])
+@perm_decorator([IsAuthenticatedAndNotReadOnly])
 def checkin_view(request):
     """POST /api/v1/geotagging/checkins/ — Record a location check-in."""
     serializer = CheckInSerializer(data=request.data)
@@ -248,7 +248,7 @@ def checkin_view(request):
 
 
 @api_view(["POST"])
-@perm_decorator([IsOfficerOrAbove])
+@perm_decorator([IsAuthenticatedAndNotReadOnly])
 def handoff_view(request):
     """POST /api/v1/geotagging/handoff/ — Transfer custodianship to a new caretaker."""
     serializer = HandoffSerializer(data=request.data)
@@ -304,7 +304,7 @@ def handoff_view(request):
 
 
 @api_view(["POST"])
-@perm_decorator([IsOfficerOrAbove])
+@perm_decorator([IsAuthenticatedAndNotReadOnly])
 def retire_tag_view(request, pk):
     """POST /api/v1/geotagging/tags/{id}/retire/ — Retire a geo tag."""
     try:

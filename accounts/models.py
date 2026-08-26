@@ -15,6 +15,7 @@ class User(AbstractUser):
         OFFICER = "OFFICER", "CVO Veterinarian / Officer (Encoder)"
         SUPERVISOR = "SUPERVISOR", "CVO Supervisor"
         COORDINATOR = "COORDINATOR", "Barangay Coordinator"
+        STAFF = "STAFF", "Staff (Read-Only)"
 
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.OFFICER)
     contact_number = models.CharField(max_length=20, blank=True, default="")
@@ -46,5 +47,14 @@ class User(AbstractUser):
         return self.role in (self.Role.ADMIN, self.Role.OFFICER, self.Role.SUPERVISOR)
 
     @property
+    def is_staff_role(self):
+        return self.role == self.Role.STAFF
+
+    @property
     def is_supervisor_or_above(self):
         return self.role in (self.Role.ADMIN, self.Role.SUPERVISOR)
+
+    @property
+    def is_read_only(self):
+        """True for roles that can only view data, not modify it."""
+        return self.role in (self.Role.COORDINATOR, self.Role.STAFF)

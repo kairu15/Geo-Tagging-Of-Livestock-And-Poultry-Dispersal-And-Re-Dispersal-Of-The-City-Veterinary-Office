@@ -10,11 +10,21 @@ const BAYAWAN = [9.6894, 122.8353];
 const SPECIES_COLORS = {
   Goat: '#16a34a', Cattle: '#2563eb', Swine: '#dc2626', Chicken: '#f59e0b', Duck: '#8b5cf6',
 };
-const SPECIES_EMOJI = {
-  Goat: '🐐', Cattle: '🐄', Swine: '🐷', Chicken: '🐔', Duck: '🦆',
+// SVG icons for map markers — simple animal silhouettes as inline SVG data URIs
+const SPECIES_SVG_PATHS = {
+  Goat: 'M12 3C9.5 3 7.5 5 7 7.2C5.3 7.8 4 9.4 4 11.5c0 1.4.6 2.6 1.6 3.4L5 20h2l.8-3.5c.7.2 1.3.3 2.2.3 1.5 0 2.8-.5 3.8-1.3.5.1 1 .1 1.5.1 3 0 5.5-2.2 5.5-5S15 6 12 6c-.7 0-1.4.1-2 .3C10.5 4.2 11.5 3 12 3z',
+  Cattle: 'M4 8c0-1 .5-2 1.5-2.5L7 4h2l.5 1h3L13 4h2l1.5 1.5c1 .5 1.5 1.5 1.5 2.5v2c0 1.5-1 3-2.5 3.5V18h-2v-4.5C10.5 13 9.5 12 9.5 11H8.5c0 1-1 2-2.5 2.5V18h-2v-4.5C2.5 13 2 12 2 11V8z',
+  Swine: 'M12 4c-2 0-3.5 1-4.5 2.5C6 7 4.5 8 4 9.5 3.2 11 3 12.5 3 14c0 2.5 2 4 4.5 4H17c2.5 0 4.5-1.5 4.5-4 0-1.5-.2-3-1-4.5-.5-1.5-2-2.5-3.5-3C15.5 5 14 4 12 4z',
+  Chicken: 'M10 3c0 0-1 1-1 2 0 .5.2 1 .5 1.3C7.5 7 6 9 6 11c0 1.5.5 3 1.5 4l-1 4h2l1-3c.6.1 1.3.2 2 .2 3 0 5.5-1.5 6.5-4 .3-.8.5-1.6.5-2.5 0-2-1.5-3.5-3.5-4l-.5-1.5c-.3-.5-.5-1-1-1.2-.5-.2-1-.5-1-.5z',
+  Duck: 'M5 7c0-1 .5-2 1.5-2.5.5-.3 1-.5 1.5-.5 1 0 2 .5 2.5 1.5.5-.3 1.2-.5 2-.5 2 0 3.5 1.5 3.5 3.5 0 1-.5 2-1 2.5v4.5h-2V12H9v3H7V10c-1-.5-2-1.5-2-3z',
 };
 
-function createIcon(color, emoji) {
+function createSpeciesSvgIcon(color, species) {
+  const svgPath = SPECIES_SVG_PATHS[species] || '';
+  const svgContent = svgPath
+    ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="${svgPath}" fill="white" fill-rule="evenodd" clip-rule="evenodd"/></svg>`
+    : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="4" fill="white"/></svg>`;
+
   return L.divIcon({
     className: '',
     iconSize: [32, 32],
@@ -25,8 +35,8 @@ function createIcon(color, emoji) {
       border:3px solid #fff;border-radius:50%;
       box-shadow:0 2px 8px rgba(0,0,0,.35);
       display:flex;align-items:center;justify-content:center;
-      font-size:16px;cursor:pointer;
-    ">${emoji}</div>`,
+      cursor:pointer;
+    ">${svgContent}</div>`,
   });
 }
 
@@ -34,8 +44,7 @@ const ICON_CACHE = {};
 function getIcon(species) {
   if (!ICON_CACHE[species]) {
     const color = SPECIES_COLORS[species] || '#6b7280';
-    const emoji = SPECIES_EMOJI[species] || '🐾';
-    ICON_CACHE[species] = createIcon(color, emoji);
+    ICON_CACHE[species] = createSpeciesSvgIcon(color, species);
   }
   return ICON_CACHE[species];
 }
@@ -164,8 +173,6 @@ export default function DispersalMap({ height = '500px', onAnimalSelect }) {
           const [lng, lat] = f.geometry.coordinates;
           const p = f.properties;
           const species = p.species || '';
-          const emoji = SPECIES_EMOJI[species] || '🐾';
-
           return (
             <Marker
               key={p.tag_id || idx}
@@ -183,7 +190,9 @@ export default function DispersalMap({ height = '500px', onAnimalSelect }) {
               <Popup closeButton={false} offset={[0, -18]}>
                 <div style={{ padding: 4, minWidth: 200, fontFamily: 'system-ui, sans-serif' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <span style={{ fontSize: 24 }}>{emoji}</span>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, background: SPECIES_COLORS[species] || '#6b7280', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="${SPECIES_SVG_PATHS[species] || ''}" fill="white" fillRule="evenodd" clipRule="evenodd"/></svg>
+                    </div>
                     <div>
                       <p style={{ fontWeight: 600, margin: 0, fontSize: 14 }}>{p.tag_id || ''}</p>
                       <p style={{ color: '#666', margin: 0, fontSize: 12 }}>{species}</p>
@@ -206,9 +215,9 @@ export default function DispersalMap({ height = '500px', onAnimalSelect }) {
       <div className="absolute bottom-3 left-3 z-[400] bg-white rounded-lg shadow-lg border border-gray-200 p-3">
         <p className="text-xs font-semibold text-gray-700 mb-2">Species</p>
         <div className="space-y-1.5">
-          {Object.entries(SPECIES_EMOJI).map(([species, emoji]) => (
+          {Object.entries(SPECIES_COLORS).map(([species, color]) => (
             <div key={species} className="flex items-center gap-2">
-              <span className="text-sm">{emoji}</span>
+              <div style={{ width: 12, height: 12, borderRadius: '50%', background: color, flexShrink: 0 }} />
               <span className="text-xs text-gray-600">{species}</span>
             </div>
           ))}

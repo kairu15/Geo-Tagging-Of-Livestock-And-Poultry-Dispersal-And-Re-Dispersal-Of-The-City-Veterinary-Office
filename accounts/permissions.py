@@ -1,4 +1,4 @@
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 
 class IsAdmin(BasePermission):
@@ -37,6 +37,18 @@ class IsReadOnly(BasePermission):
         if not (request.user and request.user.is_authenticated):
             return False
         if request.method in ("GET", "HEAD", "OPTIONS"):
+            return True
+        return request.user.role in ("ADMIN", "OFFICER", "SUPERVISOR")
+
+
+class IsAuthenticatedAndNotReadOnly(BasePermission):
+    """Authenticated users with write access (ADMIN, OFFICER, SUPERVISOR).
+    STAFF and COORDINATOR are blocked from write operations."""
+
+    def has_permission(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return False
+        if request.method in SAFE_METHODS:
             return True
         return request.user.role in ("ADMIN", "OFFICER", "SUPERVISOR")
 

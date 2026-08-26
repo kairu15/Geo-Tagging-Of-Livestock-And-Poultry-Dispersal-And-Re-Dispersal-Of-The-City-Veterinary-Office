@@ -1,6 +1,27 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Info } from 'lucide-react';
+
+const variantConfig = {
+  danger: {
+    Icon: AlertTriangle,
+    iconClasses: 'text-red-500',
+    iconBg: 'bg-red-100',
+    btn: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
+  },
+  warning: {
+    Icon: AlertTriangle,
+    iconClasses: 'text-amber-500',
+    iconBg: 'bg-amber-100',
+    btn: 'bg-amber-600 hover:bg-amber-700 focus:ring-amber-500',
+  },
+  info: {
+    Icon: Info,
+    iconClasses: 'text-blue-500',
+    iconBg: 'bg-blue-100',
+    btn: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500',
+  },
+};
 
 export default function ConfirmationModal({
   open,
@@ -8,7 +29,7 @@ export default function ConfirmationModal({
   message,
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
-  variant = 'danger', // danger | warning | info
+  variant = 'danger',
   onConfirm,
   onCancel,
   loading = false,
@@ -28,52 +49,38 @@ export default function ConfirmationModal({
 
   if (!open) return null;
 
-  const variantStyles = {
-    danger: {
-      icon: 'text-red-500',
-      iconBg: 'bg-red-100',
-      btn: 'bg-red-600 hover:bg-red-700 focus:ring-red-500',
-    },
-    warning: {
-      icon: 'text-amber-500',
-      iconBg: 'bg-amber-100',
-      btn: 'bg-amber-600 hover:bg-amber-700 focus:ring-amber-500',
-    },
-    info: {
-      icon: 'text-blue-500',
-      iconBg: 'bg-blue-100',
-      btn: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500',
-    },
-  };
-
-  const styles = variantStyles[variant] || variantStyles.danger;
+  const styles = variantConfig[variant] || variantConfig.danger;
+  const { Icon: AlertIcon } = styles;
 
   return createPortal(
     <div data-portal className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ zIndex: 9999 }}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in" onClick={onCancel} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-scale-in">
         <div className="flex items-start gap-4">
           <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${styles.iconBg}`}>
-            <AlertTriangle className={`h-5 w-5 ${styles.icon}`} />
+            <AlertIcon className={`h-5 w-5 ${styles.iconClasses}`} />
           </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-            <p className="text-sm text-gray-600 mt-1">{message}</p>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+            <p className="text-sm text-slate-600 mt-1 leading-relaxed">{message}</p>
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
           <button
             onClick={onCancel}
             disabled={loading}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+            className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors disabled:opacity-50"
           >
             {cancelLabel}
           </button>
           <button
             onClick={onConfirm}
             disabled={loading}
-            className={`px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-50 focus:ring-2 focus:ring-offset-2 ${styles.btn}`}
+            className={`px-4 py-2 text-sm font-medium text-white rounded-xl transition-colors disabled:opacity-50 focus:ring-2 focus:ring-offset-2 ${styles.btn} flex items-center gap-2`}
           >
+            {loading && (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            )}
             {loading ? 'Processing...' : confirmLabel}
           </button>
         </div>

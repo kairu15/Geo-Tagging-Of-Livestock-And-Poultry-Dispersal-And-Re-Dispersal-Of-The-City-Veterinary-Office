@@ -15,7 +15,7 @@ from .services import (
     disperse_animal, redisperse_animal, return_animal_to_cvo,
     DomainError,
 )
-from accounts.permissions import IsOfficerOrAbove, IsSupervisorOrAbove, IsReadOnly
+from accounts.permissions import IsOfficerOrAbove, IsSupervisorOrAbove, IsReadOnly, IsAuthenticatedAndNotReadOnly
 from livestock.models import Animal
 from beneficiaries.models import Beneficiary
 
@@ -127,7 +127,7 @@ class ReDispersalRequestViewSet(viewsets.ModelViewSet):
 # ---------------------------------------------------------------------------
 
 @api_view(["POST"])
-@perm_decorator([IsAuthenticated])
+@perm_decorator([IsAuthenticatedAndNotReadOnly])
 def disperse_view(request):
     """POST /api/v1/dispersal/disperse/ — Initial dispersal of an animal."""
     serializer = DisperseAnimalSerializer(data=request.data)
@@ -162,7 +162,7 @@ def disperse_view(request):
 
 
 @api_view(["POST"])
-@perm_decorator([IsAuthenticated])
+@perm_decorator([IsAuthenticatedAndNotReadOnly])
 def redisperse_view(request):
     """POST /api/v1/dispersal/redisperse/ — Re-disperse to a new beneficiary."""
     serializer = RedisperseAnimalSerializer(data=request.data)
@@ -203,7 +203,7 @@ def redisperse_view(request):
 
 
 @api_view(["POST"])
-@perm_decorator([IsAuthenticated])
+@perm_decorator([IsAuthenticatedAndNotReadOnly])
 def return_to_cvo_view(request):
     """POST /api/v1/dispersal/return-to-cvo/ — Return animal to CVO custody."""
     serializer = ReturnToCVOSerializer(data=request.data)

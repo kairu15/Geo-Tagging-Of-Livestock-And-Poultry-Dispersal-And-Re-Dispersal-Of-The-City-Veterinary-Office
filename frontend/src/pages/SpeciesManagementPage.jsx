@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios';
 import { useToast } from '../components/ui/Toast';
+import { useAuth } from '../context/AuthContext';
 import ConfirmationModal from '../components/ui/ConfirmationModal';
 import { LoadingSpinner, EmptyState } from '../components/ui/LoadingSpinner';
 import { Plus, Edit2, Trash2, Beef, X } from 'lucide-react';
@@ -146,6 +147,7 @@ function BreedModal({ breed, speciesList, onClose, onSave }) {
 export default function SpeciesManagementPage() {
   const toast = useToast();
   const qc = useQueryClient();
+  const { canWrite } = useAuth();
   const [editingSpecies, setEditingSpecies] = useState(null);
   const [editingBreed, setEditingBreed] = useState(null);
   const [showSpeciesModal, setShowSpeciesModal] = useState(false);
@@ -196,12 +198,14 @@ export default function SpeciesManagementPage() {
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">Species ({speciesList.length})</h2>
-          <button
-            onClick={() => { setEditingSpecies(null); setShowSpeciesModal(true); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100"
-          >
-            <Plus className="h-4 w-4" /> Add Species
-          </button>
+          {canWrite && (
+            <button
+              onClick={() => { setEditingSpecies(null); setShowSpeciesModal(true); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100"
+            >
+              <Plus className="h-4 w-4" /> Add Species
+            </button>
+          )}
         </div>
         {speciesList.length === 0 ? (
           <EmptyState icon={Beef} title="No species yet" description="Add your first species to get started" />
@@ -214,8 +218,12 @@ export default function SpeciesManagementPage() {
                   <span className="ml-2 text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{sp.category}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => { setEditingSpecies(sp); setShowSpeciesModal(true); }} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Edit2 className="h-4 w-4" /></button>
-                  <button onClick={() => setDeleteTarget({ type: 'species', id: sp.id, name: sp.name })} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="h-4 w-4" /></button>
+                  {canWrite && (
+                    <>
+                      <button onClick={() => { setEditingSpecies(sp); setShowSpeciesModal(true); }} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Edit2 className="h-4 w-4" /></button>
+                      <button onClick={() => setDeleteTarget({ type: 'species', id: sp.id, name: sp.name })} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="h-4 w-4" /></button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
@@ -227,12 +235,14 @@ export default function SpeciesManagementPage() {
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">Breeds ({breedList.length})</h2>
-          <button
-            onClick={() => { setEditingBreed(null); setShowBreedModal(true); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100"
-          >
-            <Plus className="h-4 w-4" /> Add Breed
-          </button>
+          {canWrite && (
+            <button
+              onClick={() => { setEditingBreed(null); setShowBreedModal(true); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100"
+            >
+              <Plus className="h-4 w-4" /> Add Breed
+            </button>
+          )}
         </div>
         {breedList.length === 0 ? (
           <EmptyState icon={Beef} title="No breeds yet" description="Add breeds under your species" />
@@ -245,8 +255,12 @@ export default function SpeciesManagementPage() {
                   <span className="ml-2 text-xs text-gray-400">{br.species_name || 'Unknown species'}</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => { setEditingBreed(br); setShowBreedModal(true); }} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Edit2 className="h-4 w-4" /></button>
-                  <button onClick={() => setDeleteTarget({ type: 'breeds', id: br.id, name: br.name })} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="h-4 w-4" /></button>
+                  {canWrite && (
+                    <>
+                      <button onClick={() => { setEditingBreed(br); setShowBreedModal(true); }} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"><Edit2 className="h-4 w-4" /></button>
+                      <button onClick={() => setDeleteTarget({ type: 'breeds', id: br.id, name: br.name })} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="h-4 w-4" /></button>
+                    </>
+                  )}
                 </div>
               </div>
             ))}

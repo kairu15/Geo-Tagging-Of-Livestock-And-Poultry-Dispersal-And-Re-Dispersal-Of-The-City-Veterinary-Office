@@ -58,6 +58,13 @@ export function AuthProvider({ children }) {
   const isAdmin = currentUser?.role === 'ADMIN';
   const isOfficerOrAbove = ['ADMIN', 'OFFICER', 'SUPERVISOR'].includes(currentUser?.role);
   const isSupervisorOrAbove = ['ADMIN', 'SUPERVISOR'].includes(currentUser?.role);
+  const isReadOnly = ['STAFF', 'COORDINATOR'].includes(currentUser?.role);
+  const canWrite = isOfficerOrAbove;
+
+  // Debug: log role info for troubleshooting
+  if (currentUser) {
+    console.log('[Auth] User role:', currentUser.role, '| canWrite:', canWrite, '| isReadOnly:', isReadOnly);
+  }
 
   return (
     <AuthContext.Provider
@@ -67,6 +74,8 @@ export function AuthProvider({ children }) {
         isAdmin,
         isOfficerOrAbove,
         isSupervisorOrAbove,
+        isReadOnly,
+        canWrite,
         isLoading,
         login,
         logout,

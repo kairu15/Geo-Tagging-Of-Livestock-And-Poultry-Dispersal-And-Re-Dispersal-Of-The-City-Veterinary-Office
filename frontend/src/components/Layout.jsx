@@ -3,25 +3,54 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Beef, Users, Handshake, ArrowLeftRight,
   FileBarChart, LogOut, Menu, X, MapPin, Satellite, Tag,
-  ArrowRightLeft, ClipboardCheck, QrCode, Bird
+  ArrowRightLeft, ClipboardCheck, QrCode, Bird, ChevronRight,
+  Building2
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-const navItems = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/animals', label: 'Animals', icon: Beef },
-  { path: '/beneficiaries', label: 'Beneficiaries', icon: Users },
-  { path: '/dispersal', label: 'Disperse', icon: Handshake, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
-  { path: '/redispersal', label: 'Re-Disperse', icon: ArrowLeftRight, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
-  { path: '/reports', label: 'Reports', icon: FileBarChart },
-  { path: '/species', label: 'Species & Breeds', icon: Bird, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
-  // Geo-Tagging section
-  { path: '/geo-tracking/map', label: 'Tracking Map', icon: Satellite, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
-  { path: '/geo-tracking/lookup', label: 'Tag Lookup', icon: QrCode },
-  { path: '/geo-tracking/tag', label: 'Tag Animal', icon: Tag, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
-  { path: '/geo-tracking/handoff', label: 'Handoff', icon: ArrowRightLeft, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
-  { path: '/geo-tracking/checkin', label: 'Check-in', icon: ClipboardCheck, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
+const navSections = [
+  {
+    label: 'Overview',
+    items: [
+      { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: 'Management',
+    items: [
+      { path: '/animals', label: 'Animals', icon: Beef },
+      { path: '/beneficiaries', label: 'Beneficiaries', icon: Users },
+      { path: '/lgu-directory', label: 'LGU Directory', icon: Building2 },
+      { path: '/species', label: 'Species & Breeds', icon: Bird, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
+    ],
+  },
+  {
+    label: 'Dispersal',
+    items: [
+      { path: '/dispersal', label: 'Disperse Animal', icon: Handshake, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
+      { path: '/redispersal', label: 'Re-Disperse', icon: ArrowLeftRight, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
+    ],
+  },
+  {
+    label: 'Geo-Tracking',
+    items: [
+      { path: '/geo-tracking/map', label: 'Tracking Map', icon: Satellite, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
+      { path: '/geo-tracking/lookup', label: 'Tag Lookup', icon: QrCode },
+      { path: '/geo-tracking/tag', label: 'Tag Animal', icon: Tag, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
+      { path: '/geo-tracking/handoff', label: 'Handoff', icon: ArrowRightLeft, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
+      { path: '/geo-tracking/checkin', label: 'Check-in', icon: ClipboardCheck, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
+    ],
+  },
+  {
+    label: 'Analytics',
+    items: [
+      { path: '/reports', label: 'Reports', icon: FileBarChart },
+    ],
+  },
 ];
+
+// Flatten for header title lookup
+const allNavItems = navSections.flatMap((s) => s.items);
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -29,82 +58,147 @@ export default function Layout() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Close sidebar on route change
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
+  // Close sidebar on Escape
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && sidebarOpen) setSidebarOpen(false);
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [sidebarOpen]);
+
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const filteredNav = navItems.filter(
-    (item) => !item.roles || item.roles.includes(user?.role)
-  );
+  const filteredNavSections = navSections.map((section) => ({
+    ...section,
+    items: section.items.filter(
+      (item) => !item.roles || item.roles.includes(user?.role)
+    ),
+  })).filter((section) => section.items.length > 0);
+
+  // STAFF and COORDINATOR users only see read-only pages
+  const readOnlyPaths = new Set(['/', '/animals', '/beneficiaries', '/reports', '/geo-tracking/map', '/geo-tracking/lookup', '/lgu-directory']);
+  const isStaffUser = user?.role === 'STAFF' || user?.role === 'COORDINATOR';
+
+  const currentLabel = allNavItems.find((n) => n.path === location.pathname)?.label || 'CVO System';
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-slate-50 overflow-hidden">
+      {/* Skip to content (accessibility) */}
+      <a href="#main-content" className="skip-to-content">
+        Skip to main content
+      </a>
+
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-30 lg:hidden transition-opacity"
           onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-200 ${
+        className={`fixed lg:static inset-y-0 left-0 z-40 w-[260px] bg-white border-r border-slate-200 flex flex-col transform transition-transform duration-250 ease-out ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
+        role="navigation"
+        aria-label="Main navigation"
       >
         {/* Logo */}
-        <div className="flex items-center gap-2 px-6 py-5 border-b border-gray-200">
-          <MapPin className="h-8 w-8 text-green-600" />
-          <div>
-            <h1 className="text-lg font-bold text-gray-900 leading-tight">CVO</h1>
-            <p className="text-xs text-gray-500 leading-tight">Livestock Dispersal</p>
+        <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-100">
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 shadow-md shadow-green-500/20">
+            <MapPin className="h-5 w-5 text-white" />
           </div>
-          <button className="ml-auto lg:hidden" onClick={() => setSidebarOpen(false)}>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-base font-bold text-slate-900 leading-tight tracking-tight">CVO System</h1>
+            <p className="text-[11px] text-slate-400 leading-tight mt-0.5">Livestock Dispersal</p>
+          </div>
+          <button
+            className="lg:hidden p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Close sidebar"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {filteredNav.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-green-50 text-green-700 border border-green-200'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`}
-              >
-                <Icon className="h-5 w-5 flex-shrink-0" />
-                {item.label}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto" aria-label="Main menu">
+          {filteredNavSections.map((section) => (
+            <div key={section.label}>
+              <p className="px-3 mb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
+                {section.label}
+              </p>
+              <div className="space-y-0.5">
+                {section.items.map((item) => {
+                  // STAFF users can only see read-only pages
+                  if (isStaffUser && !readOnlyPaths.has(item.path)) return null;
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.path;
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setSidebarOpen(false)}
+                      className={`group flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-150 ${
+                        isActive
+                          ? 'bg-green-50 text-green-700 shadow-sm ring-1 ring-green-200/60'
+                          : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                      }`}
+                      aria-current={isActive ? 'page' : undefined}
+                    >
+                      <Icon className={`h-[18px] w-[18px] flex-shrink-0 transition-colors ${
+                        isActive ? 'text-green-600' : 'text-slate-400 group-hover:text-slate-600'
+                      }`} />
+                      {item.label}
+                      {isActive && (
+                        <ChevronRight className="h-3.5 w-3.5 ml-auto text-green-400" />
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* User info + logout */}
-        <div className="border-t border-gray-200 px-4 py-4">
+        <div className="border-t border-slate-100 px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm">
-              {user?.first_name?.[0] || user?.username?.[0]?.toUpperCase()}
+            <div className="relative">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-white font-semibold text-sm shadow-sm">
+                {user?.first_name?.[0] || user?.username?.[0]?.toUpperCase()}
+              </div>
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-sm font-medium text-slate-800 truncate">
                 {user?.full_name || user?.username}
               </p>
-              <p className="text-xs text-gray-500 truncate">{user?.role}</p>
+              <p className="text-[11px] text-slate-400 truncate font-medium flex items-center gap-1.5">
+                {user?.role === 'STAFF' && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded text-[9px] font-semibold uppercase tracking-wider">
+                    Read-Only
+                  </span>
+                )}
+                {user?.role}
+              </p>
             </div>
             <button
               onClick={handleLogout}
-              className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-              title="Logout"
+              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-150"
+              title="Sign out"
+              aria-label="Sign out"
             >
               <LogOut className="h-4 w-4" />
             </button>
@@ -115,21 +209,26 @@ export default function Layout() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-4 lg:px-6">
+        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-4 lg:px-6 h-14 flex items-center gap-4 sticky top-0 z-20">
           <button
-            className="lg:hidden p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100"
+            className="lg:hidden p-2 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors"
             onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
           >
             <Menu className="h-5 w-5" />
           </button>
-          <h2 className="text-lg font-semibold text-gray-800">
-            {navItems.find((n) => n.path === location.pathname)?.label || 'CVO System'}
-          </h2>
+          <div className="flex items-center gap-2 min-w-0">
+            <h2 className="text-[15px] font-semibold text-slate-800 truncate">
+              {currentLabel}
+            </h2>
+          </div>
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-          <Outlet />
+        <main id="main-content" className="flex-1 overflow-y-auto p-4 lg:p-6 scroll-smooth">
+          <div className="animate-fade-in">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
