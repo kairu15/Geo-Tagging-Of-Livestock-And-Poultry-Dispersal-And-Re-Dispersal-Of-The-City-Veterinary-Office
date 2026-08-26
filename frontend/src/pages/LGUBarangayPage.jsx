@@ -486,17 +486,17 @@ export default function LGUBarangayPage() {
     return lguMap[selectedLGU] || [];
   }, [selectedLGU, lguMap]);
 
-  // Fetch beneficiaries for selected barangay
+  // Fetch beneficiaries for selected barangay (only when at Level 3)
   const { data: benData, isLoading: benLoading } = useBeneficiaries(
-    selectedBarangay ? { barangay: selectedBarangay.id } : {}
+    level === 3 && selectedBarangay ? { barangay: selectedBarangay.id } : null
   );
   const beneficiaries = benData?.results || [];
 
-  // Beneficiary count per barangay for the selected LGU
+  // Beneficiary count per barangay from API
   const beneficiaryCounts = useMemo(() => {
     const counts = {};
     for (const b of allBarangays) {
-      counts[b.id] = 0; // Will be populated per-LGU
+      counts[b.id] = b.beneficiary_count || 0;
     }
     return counts;
   }, [allBarangays]);

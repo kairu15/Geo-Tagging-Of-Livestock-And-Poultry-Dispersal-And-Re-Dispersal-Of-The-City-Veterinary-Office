@@ -1,5 +1,6 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from .models import Beneficiary, Barangay
@@ -12,10 +13,15 @@ from accounts.permissions import IsOfficerOrAbove, IsReadOnly
 from dispersal.services import get_beneficiary_current_holdings, get_beneficiary_full_history
 
 
+class NoPagination(PageNumberPagination):
+    page_size = None
+
+
 class BarangayViewSet(viewsets.ModelViewSet):
     queryset = Barangay.objects.all()
     serializer_class = BarangaySerializer
-    permission_classes = [IsOfficerOrAbove]
+    permission_classes = [IsReadOnly]
+    pagination_class = NoPagination
     search_fields = ["name", "city_municipality"]
 
 
@@ -23,7 +29,7 @@ class BeneficiaryViewSet(viewsets.ModelViewSet):
     queryset = Beneficiary.objects.select_related("barangay", "registered_by").filter(
         is_archived=False
     )
-    permission_classes = [IsOfficerOrAbove]
+    permission_classes = [IsReadOnly]
     filterset_fields = ["barangay", "is_active_beneficiary", "household_head"]
     search_fields = ["first_name", "last_name", "contact_number"]
     ordering_fields = ["last_name", "first_name", "date_registered"]

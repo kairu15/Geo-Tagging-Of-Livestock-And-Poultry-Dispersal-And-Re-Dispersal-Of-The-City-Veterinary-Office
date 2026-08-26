@@ -3,9 +3,14 @@ from .models import Beneficiary, Barangay
 
 
 class BarangaySerializer(serializers.ModelSerializer):
+    beneficiary_count = serializers.SerializerMethodField()
+
     class Meta:
         model = Barangay
-        fields = ["id", "name", "city_municipality", "boundary_geojson"]
+        fields = ["id", "name", "city_municipality", "boundary_geojson", "beneficiary_count"]
+
+    def get_beneficiary_count(self, obj):
+        return obj.beneficiaries.filter(is_archived=False).count()
 
 
 class BeneficiaryListSerializer(serializers.ModelSerializer):

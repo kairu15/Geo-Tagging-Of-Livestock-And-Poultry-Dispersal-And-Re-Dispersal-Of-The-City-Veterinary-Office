@@ -23,7 +23,7 @@ import AnimalGeoProfilePage from './pages/AnimalGeoProfilePage';
 import TagAnimalPage from './pages/TagAnimalPage';
 import HandoffPage from './pages/HandoffPage';
 import CheckInPage from './pages/CheckInPage';
-import LGUBarangayPage from './pages/LGUBarangayPage';
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,7 +75,6 @@ export default function App() {
                 }
               />
               <Route path="reports" element={<ReportsPage />} />
-              <Route path="lgu-directory" element={<LGUBarangayPage />} />
               <Route path="species" element={
                 <ProtectedRoute requiredRole={['ADMIN', 'OFFICER', 'SUPERVISOR']}>
                   <SpeciesManagementPage />

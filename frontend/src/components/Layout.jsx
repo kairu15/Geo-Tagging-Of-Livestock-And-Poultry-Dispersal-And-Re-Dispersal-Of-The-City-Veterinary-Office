@@ -3,8 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Beef, Users, Handshake, ArrowLeftRight,
   FileBarChart, LogOut, Menu, X, MapPin, Satellite, Tag,
-  ArrowRightLeft, ClipboardCheck, QrCode, Bird, ChevronRight,
-  Building2
+  ArrowRightLeft, ClipboardCheck, QrCode, Bird, ChevronRight
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -20,7 +19,6 @@ const navSections = [
     items: [
       { path: '/animals', label: 'Animals', icon: Beef },
       { path: '/beneficiaries', label: 'Beneficiaries', icon: Users },
-      { path: '/lgu-directory', label: 'LGU Directory', icon: Building2 },
       { path: '/species', label: 'Species & Breeds', icon: Bird, roles: ['ADMIN', 'OFFICER', 'SUPERVISOR'] },
     ],
   },
@@ -85,7 +83,7 @@ export default function Layout() {
   })).filter((section) => section.items.length > 0);
 
   // STAFF and COORDINATOR users only see read-only pages
-  const readOnlyPaths = new Set(['/', '/animals', '/beneficiaries', '/reports', '/geo-tracking/map', '/geo-tracking/lookup', '/lgu-directory']);
+  const readOnlyPaths = new Set(['/', '/animals', '/beneficiaries', '/reports', '/geo-tracking/map', '/geo-tracking/lookup']);
   const isStaffUser = user?.role === 'STAFF' || user?.role === 'COORDINATOR';
 
   const currentLabel = allNavItems.find((n) => n.path === location.pathname)?.label || 'CVO System';

@@ -14,13 +14,13 @@ from accounts.permissions import IsOfficerOrAbove, IsReadOnly
 class SpeciesViewSet(viewsets.ModelViewSet):
     queryset = Species.objects.all()
     serializer_class = SpeciesSerializer
-    permission_classes = [IsOfficerOrAbove]
+    permission_classes = [IsReadOnly]
 
 
 class BreedViewSet(viewsets.ModelViewSet):
     queryset = Breed.objects.select_related("species").all()
     serializer_class = BreedSerializer
-    permission_classes = [IsOfficerOrAbove]
+    permission_classes = [IsReadOnly]
     filterset_fields = ["species"]
 
 
@@ -28,7 +28,7 @@ class AnimalViewSet(viewsets.ModelViewSet):
     queryset = Animal.objects.select_related(
         "species", "breed", "current_owner", "current_owner__barangay",
     ).filter(is_archived=False)
-    permission_classes = [IsOfficerOrAbove]
+    permission_classes = [IsReadOnly]
     filterset_fields = ["species", "current_status", "sex", "is_batch"]
     search_fields = ["tag_id", "color_markings", "current_owner__first_name", "current_owner__last_name"]
     ordering_fields = ["tag_id", "created_at", "current_status"]

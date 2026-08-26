@@ -34,6 +34,7 @@ export const useBeneficiaries = (params = {}) => {
   return useQuery({
     queryKey: ['beneficiaries', params],
     queryFn: () => api.get('/beneficiaries/', { params }).then((r) => r.data),
+    enabled: params !== null,
   });
 };
 
@@ -221,10 +222,15 @@ export const useRedispersalFrequency = () => {
 // ---------------------------------------------------------------------------
 // Barangays
 // ---------------------------------------------------------------------------
-export const useBarangays = () => {
+export const useBarangays = (params = {}) => {
   return useQuery({
-    queryKey: ['barangays'],
-    queryFn: () => api.get('/barangays/').then((r) => r.data),
+    queryKey: ['barangays', params],
+    queryFn: async () => {
+      const res = await api.get('/barangays/', { params });
+      // Handle both paginated { results: [...] } and flat array [...] responses
+      const data = res.data;
+      return Array.isArray(data) ? { results: data, count: data.length } : data;
+    },
   });
 };
 
