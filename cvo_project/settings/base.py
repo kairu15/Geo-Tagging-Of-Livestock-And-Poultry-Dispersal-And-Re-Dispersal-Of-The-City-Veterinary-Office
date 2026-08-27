@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "dispersal",
     "reports",
     "geotagging",
+    "health",
 ]
 
 MIDDLEWARE = [

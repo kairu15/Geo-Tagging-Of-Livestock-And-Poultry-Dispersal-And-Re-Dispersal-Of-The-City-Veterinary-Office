@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Species, Breed, Animal, HealthRecord
+from .models import Species, Breed, Animal, HealthRecord, Offspring
 
 
 class SpeciesSerializer(serializers.ModelSerializer):
@@ -109,3 +109,44 @@ class HealthRecordSerializer(serializers.ModelSerializer):
             "notes", "attachment", "created_at",
         ]
         read_only_fields = ["created_at"]
+
+
+class OffspringSerializer(serializers.ModelSerializer):
+    dam_tag = serializers.CharField(source="dam.tag_id", read_only=True)
+    child_tag = serializers.SerializerMethodField()
+    child_species_name = serializers.CharField(source="child_species.name", read_only=True, default="")
+    held_by_name = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = Offspring
+        fields = [
+            "id", "dam", "dam_tag",
+            "child", "child_tag",
+            "child_tag_id", "child_sex", "child_species", "child_species_name",
+            "birth_date", "litter_size",
+            "status", "status_display",
+            "returned_to_cvo_date",
+            "held_by", "held_by_name",
+            "notes", "created_at", "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
+
+    def get_child_tag(self, obj):
+        if obj.child:
+            return obj.child.tag_id
+        return obj.child_tag_id or None
+
+    def get_held_by_name(self, obj):
+        if obj.held_by:
+            return obj.held_by.full_name
+        return None
+
+
+class OffspringCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Offspring
+        fields = [
+            "dam", "child", "child_tag_id", "child_sex", "child_species",
+            "birth_date", "litter_size", "status", "held_by", "notes",
+        ]

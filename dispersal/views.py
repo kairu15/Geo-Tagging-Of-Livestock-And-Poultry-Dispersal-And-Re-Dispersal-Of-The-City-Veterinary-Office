@@ -123,6 +123,57 @@ class ReDispersalRequestViewSet(viewsets.ModelViewSet):
 
 
 # ---------------------------------------------------------------------------
+# Quarantine zone check helper
+# ---------------------------------------------------------------------------
+
+def _check_quarantine(barangay_id):
+    """Check if a barangay has an active blocking quarantine zone.
+
+    Returns (is_blocked, warnings) tuple.
+    is_blocked=True means the transfer should be stopped.
+    warnings is a list of informational messages about non-blocking zones.
+    """
+    if not barangay_id:
+        return False, []
+
+    try:
+        from health.models import QuarantineZone
+        from django.db.models import Q
+        from django.utils import timezone
+
+        today = timezone.now().date()
+        zones = (
+            QuarantineZone.objects
+            .filter(
+                barangay_id=barangay_id,
+                is_active=True,
+                start_date__lte=today,
+            )
+            .filter(Q(end_date__isnull=True) | Q(end_date__gte=today))
+            .select_related("disease_type")
+        )
+
+        is_blocked = False
+        warnings = []
+        for z in zones:
+            if z.is_blocking:
+                is_blocked = True
+                warnings.append(
+                    f"BLOCKED: {z.name} ({z.disease_type.name}) — "
+                    f"active quarantine zone in this barangay."
+                )
+            else:
+                warnings.append(
+                    f"WARNING: {z.name} ({z.disease_type.name}) — "
+                    f"active quarantine zone (non-blocking). Transfer is allowed but logged."
+                )
+        return is_blocked, warnings
+    except Exception:
+        # If health app is not available, quarantine check is not enforced
+        return False, []
+
+
+# ---------------------------------------------------------------------------
 # Custom action endpoints — the core workflow endpoints
 # ---------------------------------------------------------------------------
 
@@ -138,6 +189,17 @@ def disperse_view(request):
         animal = Animal.objects.get(pk=data["animal_id"])
         beneficiary = Beneficiary.objects.get(pk=data["beneficiary_id"])
 
+        # Quarantine zone check
+        is_blocked, warnings = _check_quarantine(beneficiary.barangay_id)
+        if is_blocked:
+            return Response(
+                {
+                    "error": "Transfer blocked: destination barangay has an active quarantine zone.",
+                    "quarantine_warnings": warnings,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         record = disperse_animal(
             animal=animal,
             beneficiary=beneficiary,
@@ -148,10 +210,11 @@ def disperse_view(request):
             start_date=data.get("start_date"),
         )
 
-        return Response(
-            OwnershipRecordSerializer(record).data,
-            status=status.HTTP_201_CREATED,
-        )
+        response_data = OwnershipRecordSerializer(record).data
+        if warnings:
+            response_data["quarantine_warnings"] = warnings
+
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
     except Animal.DoesNotExist:
         return Response({"error": "Animal not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -174,6 +237,17 @@ def redisperse_view(request):
         new_beneficiary = Beneficiary.objects.get(pk=data["new_beneficiary_id"])
         end_reason = TransferReason.objects.get(pk=data["end_reason_id"])
 
+        # Quarantine zone check on destination
+        is_blocked, warnings = _check_quarantine(new_beneficiary.barangay_id)
+        if is_blocked:
+            return Response(
+                {
+                    "error": "Transfer blocked: destination barangay has an active quarantine zone.",
+                    "quarantine_warnings": warnings,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         record = redisperse_animal(
             animal=animal,
             new_beneficiary=new_beneficiary,
@@ -187,10 +261,11 @@ def redisperse_view(request):
             start_date=data.get("start_date"),
         )
 
-        return Response(
-            OwnershipRecordSerializer(record).data,
-            status=status.HTTP_201_CREATED,
-        )
+        response_data = OwnershipRecordSerializer(record).data
+        if warnings:
+            response_data["quarantine_warnings"] = warnings
+
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
     except Animal.DoesNotExist:
         return Response({"error": "Animal not found"}, status=status.HTTP_404_NOT_FOUND)

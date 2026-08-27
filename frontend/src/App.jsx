@@ -23,6 +23,8 @@ import AnimalGeoProfilePage from './pages/AnimalGeoProfilePage';
 import TagAnimalPage from './pages/TagAnimalPage';
 import HandoffPage from './pages/HandoffPage';
 import CheckInPage from './pages/CheckInPage';
+import RegisterBeneficiaryPage from './pages/RegisterBeneficiaryPage';
+import DiseaseReportPage from './pages/DiseaseReportPage';
 
 
 const queryClient = new QueryClient({
@@ -57,6 +59,11 @@ export default function App() {
               <Route path="animals/register" element={<AnimalRegistrationPage />} />
               <Route path="animals/:id" element={<AnimalDetailPage />} />
               <Route path="beneficiaries" element={<BeneficiariesPage />} />
+              <Route path="beneficiaries/register" element={
+                <ProtectedRoute requiredRole={['ADMIN', 'OFFICER', 'SUPERVISOR']}>
+                  <RegisterBeneficiaryPage />
+                </ProtectedRoute>
+              } />
               <Route path="beneficiaries/:id" element={<BeneficiaryDetailPage />} />
               <Route
                 path="dispersal"
@@ -98,6 +105,12 @@ export default function App() {
               <Route path="geo-tracking/checkin" element={
                 <ProtectedRoute requiredRole={['ADMIN', 'OFFICER', 'SUPERVISOR']}>
                   <CheckInPage />
+                </ProtectedRoute>
+              } />
+              {/* Health / Disease Surveillance */}
+              <Route path="health/report" element={
+                <ProtectedRoute requiredRole={['ADMIN', 'OFFICER', 'SUPERVISOR', 'COORDINATOR']}>
+                  <DiseaseReportPage />
                 </ProtectedRoute>
               } />
             </Route>

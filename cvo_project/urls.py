@@ -34,6 +34,9 @@ urlpatterns = [
     # API v1 — reports (separate app for clean separation)
     path("api/v1/reports/", include("reports.urls")),
 
+    # API v1 — health/disease surveillance
+    path("api/v1/health/", include("health.urls")),
+
     # OpenAPI schema + Swagger UI
     path("api/v1/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/v1/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),

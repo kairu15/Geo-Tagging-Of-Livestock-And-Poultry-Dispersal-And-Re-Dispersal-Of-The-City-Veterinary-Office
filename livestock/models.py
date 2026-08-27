@@ -216,3 +216,100 @@ class HealthRecord(models.Model):
 
     def __str__(self):
         return f"{self.get_record_type_display()} — {self.animal.tag_id} — {self.date}"
+
+
+class Offspring(models.Model):
+    """Offspring record linking a dam (mother) to her children.
+
+    Replaces the manual `offspring_count_returned` integer on OwnershipRecord
+    with auditable, queryable records. Each Offspring record tracks one child
+    animal born to a dispersed dam, including whether it was returned to CVO
+    to fulfill the beneficiary's pass-on obligation.
+
+    Does NOT modify the ownership/custody ledger — this is purely additive.
+    """
+
+    class Status(models.TextChoices):
+        BORN = "BORN", "Born"
+        RETURNED_TO_CVO = "RETURNED_TO_CVO", "Returned to CVO"
+        REMAINING = "REMAINING", "Remaining with Beneficiary"
+        DECEASED = "DECEASED", "Deceased"
+
+    dam = models.ForeignKey(
+        Animal,
+        on_delete=models.CASCADE,
+        related_name="offspring_as_dam",
+        help_text="The mother animal.",
+    )
+    child = models.ForeignKey(
+        Animal,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="offspring_as_child",
+        help_text="The child animal record (if registered in the system).",
+    )
+
+    # Child details (if not yet registered as a formal Animal)
+    child_tag_id = models.CharField(
+        max_length=50,
+        blank=True, default="",
+        help_text="Tag ID if child is registered; otherwise descriptive label.",
+    )
+    child_sex = models.CharField(
+        max_length=6,
+        choices=Animal.Sex.choices,
+        blank=True, default="",
+    )
+    child_species = models.ForeignKey(
+        Species,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="offspring_records",
+    )
+
+    # Birth info
+    birth_date = models.DateField()
+    litter_size = models.PositiveIntegerField(
+        default=1,
+        help_text="Number of offspring in this birth event.",
+    )
+
+    # Status tracking
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.BORN,
+    )
+    returned_to_cvo_date = models.DateField(
+        null=True, blank=True,
+        help_text="Date when this offspring was returned to CVO.",
+    )
+
+    # Beneficiary link (who currently holds this offspring)
+    held_by = models.ForeignKey(
+        "beneficiaries.Beneficiary",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="held_offspring",
+        help_text="Beneficiary currently holding this offspring.",
+    )
+
+    notes = models.TextField(blank=True, default="")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_archived = models.BooleanField(default=False)
+
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["-birth_date", "-created_at"]
+        indexes = [
+            models.Index(fields=["dam", "status"]),
+            models.Index(fields=["birth_date"]),
+        ]
+
+    def __str__(self):
+        child_label = self.child_tag_id or self.child.tag_id if self.child else "Unregistered"
+        return f"Offspring of {self.dam.tag_id}: {child_label} ({self.birth_date})"

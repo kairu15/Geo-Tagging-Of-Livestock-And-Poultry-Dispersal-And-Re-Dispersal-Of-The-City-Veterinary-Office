@@ -364,3 +364,98 @@ export const useHandoffReasons = () => {
     queryFn: () => api.get('/geotagging/handoff-reasons/').then((r) => r.data),
   });
 };
+
+// ---------------------------------------------------------------------------
+// Health / Disease Surveillance
+// ---------------------------------------------------------------------------
+export const useDiseaseTypes = () => {
+  return useQuery({
+    queryKey: ['disease-types'],
+    queryFn: () => api.get('/health/disease-types/').then((r) => r.data),
+  });
+};
+
+export const useHealthEvents = (params = {}) => {
+  return useQuery({
+    queryKey: ['health-events', params],
+    queryFn: () => api.get('/health/events/', { params }).then((r) => r.data),
+  });
+};
+
+export const useCreateHealthEvent = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/health/events/', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['health-events'] }),
+  });
+};
+
+export const useSubmitDiseaseReport = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/health/report/', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['health-events'] }),
+  });
+};
+
+export const useQuarantineZones = (params = {}) => {
+  return useQuery({
+    queryKey: ['quarantine-zones', params],
+    queryFn: () => api.get('/health/quarantine-zones/', { params }).then((r) => r.data),
+  });
+};
+
+export const useActiveQuarantineZones = () => {
+  return useQuery({
+    queryKey: ['active-quarantine-zones'],
+    queryFn: () => api.get('/health/quarantine-zones/active/').then((r) => r.data),
+    staleTime: 60_000,
+  });
+};
+
+export const useCreateQuarantineZone = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/health/quarantine-zones/', data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['quarantine-zones'] });
+      qc.invalidateQueries({ queryKey: ['active-quarantine-zones'] });
+    },
+  });
+};
+
+export const useRadiusSearch = (params) => {
+  return useQuery({
+    queryKey: ['radius-search', params],
+    queryFn: () => api.get('/health/radius-search/', { params }).then((r) => r.data),
+    enabled: !!params?.latitude && !!params?.longitude,
+  });
+};
+
+export const useQuarantineCheck = (barangayId) => {
+  return useQuery({
+    queryKey: ['quarantine-check', barangayId],
+    queryFn: () => api.get('/health/quarantine-check/', { params: { barangay_id: barangayId } }).then((r) => r.data),
+    enabled: !!barangayId,
+  });
+};
+
+// ---------------------------------------------------------------------------
+// Offspring / Lineage
+// ---------------------------------------------------------------------------
+export const useAnimalOffspring = (animalId) => {
+  return useQuery({
+    queryKey: ['animal-offspring', animalId],
+    queryFn: () => api.get(`/animals/${animalId}/offspring/`).then((r) => r.data),
+    enabled: !!animalId,
+  });
+};
+
+export const useCreateOffspring = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/animals/offspring/', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['animal-offspring'] }),
+  });
+};
+

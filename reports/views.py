@@ -4,7 +4,7 @@ from django.db.models import Count, Q, Sum
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from dispersal.models import OwnershipRecord
 
@@ -244,4 +244,85 @@ def overdue_offspring_view(request):
     return Response({
         "summary": summary,
         "results": results,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Public Transparency Dashboard (no authentication required)
+# ---------------------------------------------------------------------------
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_dashboard(request):
+    """GET /api/v1/reports/public/dashboard/ — Aggregate program statistics.
+
+    Public, read-only endpoint for transparency. Exposes NO individual
+    beneficiary PII, NO precise farm coordinates — only city/barangay-level
+    aggregation.
+    """
+    from livestock.models import Animal
+    from beneficiaries.models import Beneficiary, Barangay
+
+    # Animal counts by status
+    animal_stats = Animal.objects.filter(is_archived=False).aggregate(
+        total=Count("id"),
+        dispersed=Count("id", filter=Q(current_status="DISPERSED")),
+        available=Count("id", filter=Q(current_status="AVAILABLE")),
+        deceased=Count("id", filter=Q(current_status="DECEASED")),
+    )
+
+    # Species breakdown (aggregate only)
+    species_breakdown = (
+        Animal.objects.filter(is_archived=False)
+        .values("species__name")
+        .annotate(count=Count("id"))
+        .order_by("-count")
+    )
+
+    # Beneficiary counts
+    beneficiary_count = Beneficiary.objects.filter(
+        is_archived=False, is_active_beneficiary=True
+    ).count()
+
+    # Barangays covered (count only, no names to avoid PII exposure at this level)
+    barangays_with_beneficiaries = (
+        Beneficiary.objects
+        .filter(is_archived=False, is_active_beneficiary=True)
+        .values("barangay__city_municipality")
+        .annotate(beneficiary_count=Count("id"))
+        .order_by("-beneficiary_count")
+    )
+
+    # Transfer summary
+    total_dispersals = OwnershipRecord.objects.filter(
+        transfer_type="INITIAL_DISPERSAL"
+    ).count()
+    total_redispersals = OwnershipRecord.objects.filter(
+        transfer_type="RE_DISPERSAL"
+    ).count()
+
+    return Response({
+        "program_name": "CVO Livestock Dispersal Program",
+        "animals": {
+            "total": animal_stats["total"],
+            "currently_dispersed": animal_stats["dispersed"],
+            "available_in_cvo": animal_stats["available"],
+            "deceased": animal_stats["deceased"],
+        },
+        "species_breakdown": [
+            {"name": s["species__name"], "count": s["count"]}
+            for s in species_breakdown if s["species__name"]
+        ],
+        "beneficiaries": {
+            "active": beneficiary_count,
+        },
+        "coverage": {
+            "by_city_municipality": list(barangays_with_beneficiaries),
+        },
+        "transfers": {
+            "total_initial_dispersals": total_dispersals,
+            "total_redispersals": total_redispersals,
+            "total_transactions": total_dispersals + total_redispersals,
+        },
+        # No individual PII, no coordinates, no contact info
     })

@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useBeneficiaries, useBarangays } from '../api/hooks';
+import { useAuth } from '../context/AuthContext';
 import {
   Search, Users, ChevronDown, MapPin, Phone, Building2,
-  ArrowLeft, ChevronRight, Filter, Beef, List, Map,
+  ArrowLeft, ChevronRight, Filter, Beef, List, Map, Plus,
 } from 'lucide-react';
 import BeneficiaryDetailModal from '../components/BeneficiaryDetailModal';
 import StatusBadge from '../components/ui/StatusBadge';
+import SearchableBarangaySelect from '../components/ui/SearchableBarangaySelect';
 
 // ---------------------------------------------------------------------------
 // District grouping for LGU drill-down
@@ -79,15 +82,40 @@ function BeneficiaryTableSkeleton() {
 // ---------------------------------------------------------------------------
 export default function BeneficiariesPage() {
   const [activeTab, setActiveTab] = useState('list'); // 'list' | 'location'
+  const { canWrite } = useAuth();
 
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-slate-900 tracking-tight">Beneficiaries</h1>
-        <p className="text-sm text-slate-500 mt-0.5">
-          View and manage registered beneficiaries
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Beneficiaries</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            View and manage registered beneficiaries
+          </p>
+        </div>
+        {canWrite ? (
+          <Link
+            to="/beneficiaries/register"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all duration-150 text-sm font-medium shadow-md shadow-green-600/15"
+          >
+            <Plus className="h-4 w-4" />
+            Register Beneficiary
+          </Link>
+        ) : (
+          <div className="relative group">
+            <button
+              disabled
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-400 rounded-xl text-sm font-medium cursor-not-allowed"
+            >
+              <Plus className="h-4 w-4" />
+              Register Beneficiary
+            </button>
+            <div className="absolute right-0 top-full mt-1 w-48 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+              View only — contact a Supervisor to register beneficiaries
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tab Toggle */}
@@ -158,37 +186,12 @@ function AllBeneficiariesView() {
               aria-label="Search beneficiaries"
             />
           </div>
-          <div className="relative">
-            <select
-              value={barangayFilter}
-              onChange={(e) => setBarangayFilter(e.target.value)}
-              className="appearance-none w-full sm:w-56 pl-3 pr-9 py-2.5 border border-slate-200 rounded-xl text-sm bg-white text-slate-700 focus:ring-2 focus:ring-green-500/30 focus:border-green-500 outline-none transition-all cursor-pointer"
-              aria-label="Filter by barangay"
-            >
-              <option value="">All Barangays</option>
-              {(() => {
-                // Group barangays by city/municipality, sorted alphabetically
-                const grouped = {};
-                if (barangays?.results) {
-                  for (const b of barangays.results) {
-                    if (!grouped[b.city_municipality]) grouped[b.city_municipality] = [];
-                    grouped[b.city_municipality].push(b);
-                  }
-                }
-                const sortedCities = Object.keys(grouped).sort();
-                return sortedCities.map((city) => (
-                  <optgroup key={city} label={city}>
-                    {grouped[city]
-                      .sort((a, b) => a.name.localeCompare(b.name))
-                      .map((b) => (
-                        <option key={b.id} value={b.id}>{b.name}</option>
-                      ))}
-                  </optgroup>
-                ));
-              })()}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-          </div>
+          <SearchableBarangaySelect
+            value={barangayFilter}
+            onChange={setBarangayFilter}
+            barangays={barangays?.results || []}
+            className="w-full sm:w-56"
+          />
           <div className="relative">
             <select
               value={statusFilter}

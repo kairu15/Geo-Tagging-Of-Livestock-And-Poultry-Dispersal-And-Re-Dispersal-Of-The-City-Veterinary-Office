@@ -4,6 +4,7 @@ from .views import (
     redispersal_frequency_view,
     dispersal_csv_export,
     overdue_offspring_view,
+    public_dashboard,
 )
 
 urlpatterns = [
@@ -11,4 +12,6 @@ urlpatterns = [
     path("redispersal-frequency/", redispersal_frequency_view, name="redispersal-frequency"),
     path("dispersal-export/", dispersal_csv_export, name="dispersal-csv-export"),
     path("overdue-offspring/", overdue_offspring_view, name="overdue-offspring"),
+    # Public dashboard (no auth required)
+    path("public/dashboard/", public_dashboard, name="public-dashboard"),
 ]

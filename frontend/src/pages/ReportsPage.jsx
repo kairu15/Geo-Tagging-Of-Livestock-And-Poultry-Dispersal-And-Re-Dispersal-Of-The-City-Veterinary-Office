@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useDispersalSummary, useRedispersalFrequency, useSpecies, useBarangays } from '../api/hooks';
 import api from '../api/axios';
 import { FileBarChart, Download, AlertTriangle, TrendingUp, BarChart3 } from 'lucide-react';
+import SearchableBarangaySelect from '../components/ui/SearchableBarangaySelect';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 function CustomTooltip({ active, payload, label }) {
@@ -104,17 +105,12 @@ export default function ReportsPage() {
               <option key={sp.id} value={sp.id}>{sp.name}</option>
             ))}
           </select>
-          <select
+          <SearchableBarangaySelect
             value={filters.barangay || ''}
-            onChange={(e) => handleFilterChange('barangay', e.target.value)}
-            className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-green-500/30 focus:border-green-500 outline-none cursor-pointer"
-            aria-label="Filter by barangay"
-          >
-            <option value="">All Barangays</option>
-            {barangays?.results?.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
+            onChange={(val) => handleFilterChange('barangay', val)}
+            barangays={barangays?.results || []}
+            className="w-full sm:w-56"
+          />
         </div>
       </div>
 
