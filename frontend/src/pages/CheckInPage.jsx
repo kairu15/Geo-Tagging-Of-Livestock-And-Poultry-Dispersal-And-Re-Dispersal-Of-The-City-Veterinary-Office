@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { ClipboardCheck, CheckCircle, AlertCircle, Camera, Maximize2, Minimize2, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { ClipboardCheck, CheckCircle, AlertCircle, Camera, Maximize2, Minimize2, WifiOff, RefreshCw, CloudOff, Cloud, Loader2 } from 'lucide-react';
 import { useCustodianships, useCreateCheckin } from '../api/hooks';
 import { useToast } from '../components/ui/Toast';
+import { useOfflineQueue } from '../api/useOfflineQueue';
 import MapPicker from '../components/map/MapPicker';
 
 export default function CheckInPage() {
@@ -21,6 +22,7 @@ export default function CheckInPage() {
   const activeCustodianships = custsData?.results || [];
 
   const [mapFullscreen, setMapFullscreen] = useState(false);
+  const { pendingCount, syncing, syncProgress, lastSyncResult, enqueue, retryNow } = useOfflineQueue();
 
   const onSubmit = async (data) => {
     if (!position) {
@@ -28,22 +30,33 @@ export default function CheckInPage() {
       return;
     }
 
-    try {
-      const formData = new FormData();
-      formData.append('custodianship_id', data.custodianship_id);
-      formData.append('latitude', position[0]);
-      formData.append('longitude', position[1]);
-      formData.append('source', data.source || 'FIELD_VISIT');
-      if (data.notes) formData.append('notes', data.notes);
-      if (photoFile) formData.append('photo', photoFile);
+    const formData = new FormData();
+    formData.append('custodianship_id', data.custodianship_id);
+    formData.append('latitude', position[0]);
+    formData.append('longitude', position[1]);
+    formData.append('source', data.source || 'FIELD_VISIT');
+    if (data.notes) formData.append('notes', data.notes);
+    if (photoFile) formData.append('photo', photoFile);
 
+    try {
       await createCheckin.mutateAsync(formData);
       setSuccess(true);
     } catch (err) {
-      const msg = err?.message === 'Network Error'
-        ? 'You appear to be offline. Check-in will be retried when connectivity returns.'
-        : err.response?.data?.error || 'Check-in failed. Please try again.';
-      toast.error(msg);
+      const isNetworkError = err?.message === 'Network Error' || !navigator.onLine;
+      if (isNetworkError) {
+        // Queue for later retry
+        await enqueue({
+          custodianship_id: data.custodianship_id,
+          latitude: position[0],
+          longitude: position[1],
+          source: data.source || 'FIELD_VISIT',
+          notes: data.notes || '',
+          photo: photoFile,
+        });
+        toast.warning(`You're offline. Check-in saved to queue (${pendingCount + 1} pending). It will sync automatically when you reconnect.`);
+      } else {
+        toast.error(err.response?.data?.error || 'Check-in failed. Please try again.');
+      }
     }
   };
 
@@ -53,10 +66,15 @@ export default function CheckInPage() {
         <div className="bg-green-50 rounded-2xl p-8 border border-green-200">
           <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-900 mb-2">Check-in Recorded!</h2>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600 mb-2">
             Location has been recorded for the active custodianship.
           </p>
-          <div className="flex gap-3 justify-center">
+          {pendingCount > 0 && (
+            <p className="text-sm text-amber-600 mb-4">
+              {pendingCount} queued check-in{pendingCount !== 1 ? 's' : ''} will sync when online.
+            </p>
+          )}
+          <div className="flex gap-3 justify-center flex-wrap">
             <button
               onClick={() => {
                 setSuccess(false);
@@ -73,6 +91,16 @@ export default function CheckInPage() {
             >
               View Map
             </button>
+            {pendingCount > 0 && navigator.onLine && (
+              <button
+                onClick={retryNow}
+                disabled={syncing}
+                className="px-4 py-2 bg-amber-500 text-white font-medium rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Sync Queue ({pendingCount})
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -95,6 +123,57 @@ export default function CheckInPage() {
         <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
           <AlertCircle className="h-4 w-4 flex-shrink-0" />
           {createCheckin.error.response?.data?.error || 'Check-in failed. Please try again.'}
+        </div>
+      )}
+
+      {/* Offline queue status banner */}
+      {pendingCount > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 mt-0.5">
+              {syncing ? (
+                <Loader2 className="h-5 w-5 text-amber-600 animate-spin" />
+              ) : navigator.onLine ? (
+                <Cloud className="h-5 w-5 text-amber-600" />
+              ) : (
+                <CloudOff className="h-5 w-5 text-amber-600" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-amber-800">
+                {syncing
+                  ? `Syncing queued check-ins...${syncProgress ? ` (${syncProgress.current}/${syncProgress.total})` : ''}`
+                  : `${pendingCount} check-in${pendingCount !== 1 ? 's' : ''} queued for sync`
+                }
+              </p>
+              <p className="text-xs text-amber-600 mt-0.5">
+                {!navigator.onLine
+                  ? 'You\'re offline. Check-ins will sync when you reconnect.'
+                  : lastSyncResult
+                    ? `Last sync: ${lastSyncResult.succeeded} succeeded, ${lastSyncResult.failed} failed.`
+                    : 'Will sync automatically when online.'
+                }
+              </p>
+              {!syncing && navigator.onLine && (
+                <button
+                  type="button"
+                  onClick={retryNow}
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 hover:text-amber-900 transition-colors"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  Sync now
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Offline indicator */}
+      {!navigator.onLine && pendingCount === 0 && (
+        <div className="flex items-center gap-2 p-3 bg-slate-100 border border-slate-200 rounded-xl text-slate-600 text-sm">
+          <WifiOff className="h-4 w-4 flex-shrink-0" />
+          You're offline. Check-ins will be queued and synced when you reconnect.
         </div>
       )}
 
