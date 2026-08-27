@@ -120,11 +120,23 @@ def tag_animal(animal, tag_type, tagged_by, initial_caretaker, coordinates, inta
     return geo_tag, custodianship
 
 
-def record_location_checkin(custodianship, coordinates, checked_in_by, source, photo=None, notes=""):
+# ---------------------------------------------------------------------------
+# GPS accuracy threshold for auto-flagging (configurable via settings)
+# Default: 50 meters — check-ins with accuracy worse than this are flagged.
+# ---------------------------------------------------------------------------
+GPS_ACCURACY_THRESHOLD_METERS = 50
+
+
+def record_location_checkin(custodianship, coordinates, checked_in_by, source,
+                            photo=None, notes="",
+                            gps_accuracy_meters=None, gps_altitude_meters=None,
+                            gps_speed_mps=None):
     """
     Append a LocationCheckIn to an active custodianship.
 
     Does NOT change custody state — only location tracking within the same caretaker period.
+    If gps_accuracy_meters exceeds the configured threshold, the check-in is
+    automatically flagged for review.
     """
     _validate_coordinates(coordinates.get("latitude"), coordinates.get("longitude"))
 
@@ -136,6 +148,21 @@ def record_location_checkin(custodianship, coordinates, checked_in_by, source, p
                 f"Custodianship #{cust.id} is {cust.status}, not ACTIVE."
             )
 
+        # Auto-flag low-confidence check-ins
+        needs_review = False
+        review_reason = ""
+        if gps_accuracy_meters is not None:
+            try:
+                accuracy = float(gps_accuracy_meters)
+                if accuracy > GPS_ACCURACY_THRESHOLD_METERS:
+                    needs_review = True
+                    review_reason = (
+                        f"GPS accuracy {accuracy:.1f}m exceeds "
+                        f"{GPS_ACCURACY_THRESHOLD_METERS}m threshold"
+                    )
+            except (TypeError, ValueError):
+                pass
+
         checkin = LocationCheckIn.objects.create(
             custodianship=cust,
             latitude=coordinates["latitude"],
@@ -144,6 +171,11 @@ def record_location_checkin(custodianship, coordinates, checked_in_by, source, p
             source=source,
             photo=photo,
             notes=notes,
+            gps_accuracy_meters=gps_accuracy_meters,
+            gps_altitude_meters=gps_altitude_meters,
+            gps_speed_mps=gps_speed_mps,
+            needs_review=needs_review,
+            review_reason=review_reason,
         )
 
         # Update the geo tag's last_checkin timestamp

@@ -1,4 +1,5 @@
 from django.db import models
+from simple_history.models import HistoricalRecords
 
 
 class TransferReason(models.Model):
@@ -138,6 +139,8 @@ class OwnershipRecord(models.Model):
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
+
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ["-start_date", "-created_at"]

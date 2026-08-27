@@ -1,6 +1,8 @@
 import csv
-from django.db.models import Count, Q
+from datetime import timedelta
+from django.db.models import Count, Q, Sum
 from django.http import HttpResponse
+from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -156,3 +158,90 @@ def dispersal_csv_export(request):
         ])
 
     return response
+
+
+# ---------------------------------------------------------------------------
+# Overdue Offspring Pass-On Report
+# ---------------------------------------------------------------------------
+# Assumption: The "pass-on obligation" means that beneficiaries with active
+# dispersal records are expected to return a minimum number of offspring to
+# CVO. The threshold is configurable via the `required_offspring` query param
+# (default: 1). A beneficiary is "overdue" if their active record has
+# offspring_count_returned < required_offspring AND the custody has been active
+# longer than the overdue_days threshold (default: 365 days).
+# ---------------------------------------------------------------------------
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def overdue_offspring_view(request):
+    """GET /api/v1/reports/overdue-offspring/ — Beneficiaries overdue on pass-on obligation.
+
+    Query params:
+      overdue_days: int — minimum days of active custody before flagged (default 365)
+      required_offspring: int — minimum offspring to return (default 1)
+      barangay: int — filter by barangay ID
+      species: int — filter by species ID
+    """
+    overdue_days = int(request.query_params.get("overdue_days", 365))
+    required_offspring = int(request.query_params.get("required_offspring", 1))
+    barangay = request.query_params.get("barangay")
+    species = request.query_params.get("species")
+
+    cutoff_date = timezone.now().date() - timedelta(days=overdue_days)
+
+    qs = (
+        OwnershipRecord.objects
+        .filter(
+            status=OwnershipRecord.RecordStatus.ACTIVE,
+            transfer_type=OwnershipRecord.TransferType.INITIAL_DISPERSAL,
+            start_date__lte=cutoff_date,
+        )
+        .select_related(
+            "animal", "animal__species",
+            "beneficiary", "beneficiary__barangay",
+        )
+    )
+
+    if barangay:
+        qs = qs.filter(beneficiary__barangay_id=barangay)
+    if species:
+        qs = qs.filter(animal__species_id=species)
+
+    # Filter to those who haven't met the obligation
+    results = []
+    for record in qs:
+        if record.offspring_count_returned < required_offspring:
+            days_active = (timezone.now().date() - record.start_date).days
+            results.append({
+                "ownership_record_id": record.id,
+                "animal_id": record.animal.id,
+                "animal_tag": record.animal.tag_id,
+                "species": record.animal.species.name if record.animal.species else None,
+                "beneficiary_id": record.beneficiary.id,
+                "beneficiary_name": record.beneficiary.full_name,
+                "barangay": record.beneficiary.barangay.name if record.beneficiary.barangay else None,
+                "start_date": str(record.start_date),
+                "days_active": days_active,
+                "offspring_count_returned": record.offspring_count_returned,
+                "required_offspring": required_offspring,
+                "shortfall": required_offspring - record.offspring_count_returned,
+            })
+
+    # Summary
+    summary = {
+        "total_overdue": len(results),
+        "overdue_days_threshold": overdue_days,
+        "required_offspring": required_offspring,
+        "by_species": {},
+        "by_barangay": {},
+    }
+    for r in results:
+        sp = r["species"] or "Unknown"
+        br = r["barangay"] or "Unknown"
+        summary["by_species"][sp] = summary["by_species"].get(sp, 0) + 1
+        summary["by_barangay"][br] = summary["by_barangay"].get(br, 0) + 1
+
+    return Response({
+        "summary": summary,
+        "results": results,
+    })

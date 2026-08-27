@@ -6,6 +6,7 @@ from .views import (
     tag_lineage_view, tag_checkins_view, tag_lookup_view,
     checkin_view, handoff_view, retire_tag_view,
     active_geo_map_view, custody_trail_view,
+    review_checkin_view,
 )
 
 router = DefaultRouter()
@@ -18,6 +19,7 @@ router.register(r"handoff-reasons", HandoffReasonViewSet, basename="handoff-reas
 urlpatterns = [
     # Custom action endpoints (MUST come before router to avoid pk conflicts)
     path("checkins/create/", checkin_view, name="checkin-create"),
+    path("checkins/<int:pk>/review/", review_checkin_view, name="checkin-review"),
     path("handoff/", handoff_view, name="handoff"),
 
     # Map endpoints

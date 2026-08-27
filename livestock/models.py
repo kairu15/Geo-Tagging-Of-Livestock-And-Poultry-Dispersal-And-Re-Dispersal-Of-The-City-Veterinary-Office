@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
+from simple_history.models import HistoricalRecords
 
 
 class Species(models.Model):
@@ -137,6 +138,8 @@ class Animal(models.Model):
 
     # Soft deletion
     is_archived = models.BooleanField(default=False)
+
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ["-created_at"]

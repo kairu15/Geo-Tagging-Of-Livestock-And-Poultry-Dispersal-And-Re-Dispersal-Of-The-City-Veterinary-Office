@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "django_filters",
     "drf_spectacular",
     "corsheaders",
+    "simple_history",
     # Local apps
     "accounts",
     "beneficiaries",
@@ -55,6 +56,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
 ROOT_URLCONF = "cvo_project.urls"
@@ -134,6 +136,16 @@ REST_FRAMEWORK = {
         "rest_framework.filters.OrderingFilter",
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # Throttling — protect against brute-force and abuse
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "30/minute",
+        "user": "120/minute",
+        "login": "10/minute",
+    },
 }
 
 # ---------------------------------------------------------------------------

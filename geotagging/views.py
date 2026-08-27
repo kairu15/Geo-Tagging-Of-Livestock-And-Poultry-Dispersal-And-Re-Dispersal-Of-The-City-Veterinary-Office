@@ -11,6 +11,7 @@ from .serializers import (
     LocationCheckInSerializer,
     HandoffReasonSerializer,
     TagAnimalSerializer, HandoffSerializer, CheckInSerializer, RetireTagSerializer,
+    ReviewCheckInSerializer,
 )
 from .services import (
     tag_animal, record_location_checkin, handoff_custodianship,
@@ -234,6 +235,9 @@ def checkin_view(request):
             source=data["source"],
             photo=data.get("photo"),
             notes=data.get("notes", ""),
+            gps_accuracy_meters=data.get("gps_accuracy_meters"),
+            gps_altitude_meters=data.get("gps_altitude_meters"),
+            gps_speed_mps=data.get("gps_speed_mps"),
         )
 
         return Response(
@@ -358,3 +362,32 @@ def custody_trail_view(request, pk):
 
     trail = get_custody_trail(geo_tag)
     return Response(trail)
+
+
+@api_view(["POST"])
+@perm_decorator([IsAuthenticatedAndNotReadOnly])
+def review_checkin_view(request, pk):
+    """POST /api/v1/geotagging/checkins/{id}/review/ — Approve or flag a low-confidence check-in."""
+    try:
+        checkin = LocationCheckIn.objects.get(pk=pk)
+    except LocationCheckIn.DoesNotExist:
+        return Response({"error": "Check-in not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = ReviewCheckInSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+
+    from django.utils import timezone
+    checkin.reviewed_by = request.user
+    checkin.reviewed_at = timezone.now()
+    if data["action"] == "flag":
+        checkin.review_reason = data.get("notes", "") or checkin.review_reason
+        checkin.needs_review = True
+    else:
+        # Approve — clear the review flag
+        checkin.needs_review = False
+        if not checkin.review_reason:
+            checkin.review_reason = "Approved by " + (request.user.get_full_name() or request.user.username)
+    checkin.save(update_fields=["reviewed_by", "reviewed_at", "needs_review", "review_reason"])
+
+    return Response(LocationCheckInSerializer(checkin).data)

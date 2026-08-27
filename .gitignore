@@ -1,0 +1,62 @@
+# ==============================================================================
+# CVO Geo-Tagging Livestock Dispersal System — .gitignore
+# ==============================================================================
+
+# ---------- Secrets & Environment ----------
+.env
+.env.*
+!.env.example
+
+# ---------- Python ----------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# ---------- Django ----------
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+*.log
+
+# ---------- Node / Frontend ----------
+node_modules/
+frontend/dist/
+frontend/build/
+.vite/
+
+# ---------- IDE & Editor ----------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+*.sublime-project
+*.sublime-workspace
+
+# ---------- OS ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- Testing & Coverage ----------
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+.pytest_cache/
+.tox/
+.nox/
+
+# ---------- Celery ----------
+celerybeat-schedule
+celerybeat.pid

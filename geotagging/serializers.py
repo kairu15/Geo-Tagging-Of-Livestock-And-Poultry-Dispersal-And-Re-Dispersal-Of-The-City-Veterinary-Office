@@ -153,6 +153,7 @@ class CustodianshipListSerializer(serializers.ModelSerializer):
 class LocationCheckInSerializer(serializers.ModelSerializer):
     checked_in_by_name = serializers.SerializerMethodField()
     source_display = serializers.CharField(source="get_source_display", read_only=True)
+    reviewed_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = LocationCheckIn
@@ -162,12 +163,22 @@ class LocationCheckInSerializer(serializers.ModelSerializer):
             "checked_in_at", "checked_in_by", "checked_in_by_name",
             "source", "source_display",
             "photo", "notes",
+            # GPS accuracy metadata (Priority 3)
+            "gps_accuracy_meters", "gps_altitude_meters", "gps_speed_mps",
+            # Review flag
+            "needs_review", "review_reason",
+            "reviewed_by", "reviewed_by_name", "reviewed_at",
         ]
-        read_only_fields = ["checked_in_at"]
+        read_only_fields = ["checked_in_at", "needs_review", "review_reason", "reviewed_by", "reviewed_at"]
 
     def get_checked_in_by_name(self, obj):
         if obj.checked_in_by:
             return obj.checked_in_by.get_full_name() or obj.checked_in_by.username
+        return None
+
+    def get_reviewed_by_name(self, obj):
+        if obj.reviewed_by:
+            return obj.reviewed_by.get_full_name() or obj.reviewed_by.username
         return None
 
 
@@ -227,6 +238,22 @@ class CheckInSerializer(serializers.Serializer):
     longitude = serializers.DecimalField(max_digits=9, decimal_places=6)
     source = serializers.ChoiceField(choices=LocationCheckIn.CheckInSource.choices, default="FIELD_VISIT")
     photo = serializers.ImageField(required=False, allow_null=True)
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
+    # GPS accuracy metadata (Priority 3)
+    gps_accuracy_meters = serializers.DecimalField(
+        max_digits=8, decimal_places=2, required=False, allow_null=True
+    )
+    gps_altitude_meters = serializers.DecimalField(
+        max_digits=8, decimal_places=2, required=False, allow_null=True
+    )
+    gps_speed_mps = serializers.DecimalField(
+        max_digits=6, decimal_places=2, required=False, allow_null=True
+    )
+
+
+class ReviewCheckInSerializer(serializers.Serializer):
+    """Request body for POST /api/v1/geotagging/checkins/{id}/review/"""
+    action = serializers.ChoiceField(choices=["approve", "flag"], default="approve")
     notes = serializers.CharField(required=False, allow_blank=True, default="")
 
 

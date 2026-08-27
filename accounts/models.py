@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from simple_history.models import HistoricalRecords
 
 
 class User(AbstractUser):
@@ -31,6 +32,8 @@ class User(AbstractUser):
         default=True,
         help_text="False = deactivated account; still exists for audit trail.",
     )
+
+    history = HistoricalRecords()
 
     class Meta:
         ordering = ["-date_joined"]

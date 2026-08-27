@@ -1,4 +1,5 @@
 from django.db import models
+from simple_history.models import HistoricalRecords
 
 
 class Barangay(models.Model):
@@ -83,6 +84,17 @@ class Beneficiary(models.Model):
         related_name="registered_beneficiaries",
     )
 
+    # Philippine Data Privacy Act (RA 10173) compliance
+    privacy_consent_given = models.BooleanField(
+        default=False,
+        help_text="Beneficiary has been informed of and consented to data collection "
+                  "as required by the Philippine Data Privacy Act of 2012 (RA 10173).",
+    )
+    privacy_consent_date = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Timestamp when privacy consent was obtained.",
+    )
+
     # Geo-coordinates (farm/home default)
     latitude = models.DecimalField(
         max_digits=9,
@@ -101,6 +113,8 @@ class Beneficiary(models.Model):
 
     # Soft deletion
     is_archived = models.BooleanField(default=False)
+
+    history = HistoricalRecords()
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

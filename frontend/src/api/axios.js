@@ -5,6 +5,53 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// ---------------------------------------------------------------------------
+// Global error helper — extracts a consistent, actionable error message
+// from any API response shape (DRF standard, custom, network errors).
+// ---------------------------------------------------------------------------
+export function getApiErrorMessage(error) {
+  if (!error) return 'An unknown error occurred.';
+
+  // Network / timeout
+  if (!error.response) {
+    if (error.code === 'ECONNABORTED') return 'Request timed out. Please try again.';
+    if (error.message === 'Network Error') return 'Network error. Check your connection.';
+    return error.message || 'An unexpected error occurred.';
+  }
+
+  const { status, data } = error.response;
+
+  // DRF-style errors
+  if (data) {
+    // Single error string: { "error": "..." } or { "detail": "..." }
+    if (typeof data === 'string') return data;
+    if (data.error) return data.error;
+    if (data.detail) return data.detail;
+    if (data.non_field_errors) {
+      const msgs = Array.isArray(data.non_field_errors)
+        ? data.non_field_errors
+        : [data.non_field_errors];
+      return msgs.join(' ');
+    }
+    // Field-level errors: { "field": ["error1", ...] }
+    const fieldErrors = Object.entries(data)
+      .filter(([key]) => key !== 'type')
+      .flatMap(([, val]) => (Array.isArray(val) ? val : [String(val)]));
+    if (fieldErrors.length > 0) return fieldErrors.join(' ');
+  }
+
+  // Status-based fallback
+  switch (status) {
+    case 400: return 'Bad request. Please check your input.';
+    case 401: return 'Session expired. Please log in again.';
+    case 403: return 'You do not have permission to perform this action.';
+    case 404: return 'The requested resource was not found.';
+    case 429: return 'Too many requests. Please wait a moment and try again.';
+    case 500: return 'Server error. Please try again later.';
+    default: return `Error ${status}: ${data?.message || 'Request failed'}`;
+  }
+}
+
 // Request interceptor: attach JWT access token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');

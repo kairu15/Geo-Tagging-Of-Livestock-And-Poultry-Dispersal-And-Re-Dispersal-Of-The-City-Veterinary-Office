@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
+from simple_history.models import HistoricalRecords
 
 
 class HandoffReason(models.Model):
@@ -127,6 +128,8 @@ class GeoTag(models.Model):
         null=True, blank=True,
         help_text="Last ping from GPS device — separate from checkin to detect device failures.",
     )
+
+    history = HistoricalRecords()
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -294,6 +297,44 @@ class LocationCheckIn(models.Model):
     )
     photo = models.ImageField(upload_to="geotagging/checkins/", blank=True, null=True)
     notes = models.TextField(blank=True, default="")
+
+    # --- GPS accuracy / precision metadata (Priority 3) ---
+    gps_accuracy_meters = models.DecimalField(
+        max_digits=8, decimal_places=2,
+        null=True, blank=True,
+        help_text="GPS accuracy radius in meters as reported by the device.",
+    )
+    gps_altitude_meters = models.DecimalField(
+        max_digits=8, decimal_places=2,
+        null=True, blank=True,
+        help_text="Altitude in meters above WGS84 ellipsoid.",
+    )
+    gps_speed_mps = models.DecimalField(
+        max_digits=6, decimal_places=2,
+        null=True, blank=True,
+        help_text="Speed in meters per second at time of check-in.",
+    )
+
+    # --- Review flag for low-confidence check-ins ---
+    needs_review = models.BooleanField(
+        default=False,
+        help_text="True if GPS accuracy exceeded the configured threshold; requires manual review.",
+    )
+    review_reason = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+        help_text="Why this check-in was flagged (e.g., 'Accuracy 150m exceeds 50m threshold').",
+    )
+    reviewed_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_checkins",
+        help_text="Officer who reviewed and cleared/flagged this check-in.",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-checked_in_at"]

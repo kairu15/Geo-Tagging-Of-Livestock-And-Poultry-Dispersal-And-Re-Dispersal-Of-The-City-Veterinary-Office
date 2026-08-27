@@ -53,9 +53,14 @@ class BeneficiaryDetailSerializer(serializers.ModelSerializer):
             "registered_by_name",
             "latitude", "longitude",
             "is_archived", "current_animal_count",
+            # Data Privacy Act compliance
+            "privacy_consent_given", "privacy_consent_date",
             "created_at", "updated_at",
         ]
-        read_only_fields = ["date_registered", "created_at", "updated_at"]
+        read_only_fields = [
+            "date_registered", "created_at", "updated_at",
+            "privacy_consent_date",
+        ]
 
     def get_current_animal_count(self, obj):
         from livestock.models import Animal

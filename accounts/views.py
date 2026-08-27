@@ -2,10 +2,15 @@ from django.contrib.auth import get_user_model
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .serializers import UserSerializer, UserCreateSerializer, LoginSerializer
 from .permissions import IsAdmin
+
+
+class LoginThrottle(AnonRateThrottle):
+    rate = "10/minute"
 
 User = get_user_model()
 
@@ -31,6 +36,13 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
 @api_view(["POST"])
 @permission_classes([permissions.AllowAny])
 def login_view(request):
+    # Apply stricter throttle on login attempts
+    throttle = LoginThrottle()
+    if not throttle.allow_request(request, None):
+        return Response(
+            {"error": "Too many login attempts. Please try again later."},
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
     """JWT login — returns access + refresh tokens."""
     serializer = LoginSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
