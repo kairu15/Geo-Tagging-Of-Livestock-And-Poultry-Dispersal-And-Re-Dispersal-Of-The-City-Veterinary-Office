@@ -12,10 +12,12 @@ const api = axios.create({
 export function getApiErrorMessage(error) {
   if (!error) return 'An unknown error occurred.';
 
-  // Network / timeout
+  // Network / timeout / offline
   if (!error.response) {
     if (error.code === 'ECONNABORTED') return 'Request timed out. Please try again.';
-    if (error.message === 'Network Error') return 'Network error. Check your connection.';
+    if (error.message === 'Network Error' || !navigator.onLine) {
+      return 'You appear to be offline. Check your internet connection and try again.';
+    }
     return error.message || 'An unexpected error occurred.';
   }
 
@@ -144,3 +146,14 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+// ---------------------------------------------------------------------------
+// Online/offline helpers for components
+// ---------------------------------------------------------------------------
+export function useNetworkStatus() {
+  // Simple hook-free check — components can call navigator.onLine directly
+  // This function exists for centralization if needed later.
+  return {
+    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+  };
+}

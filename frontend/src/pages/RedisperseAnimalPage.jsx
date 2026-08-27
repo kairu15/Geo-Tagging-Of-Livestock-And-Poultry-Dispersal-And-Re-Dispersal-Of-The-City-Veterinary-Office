@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useAnimals, useBeneficiaries, useTransferReasons, useRedisperseAnimal } from '../api/hooks';
 import { useToast } from '../components/ui/Toast';
-import { ArrowLeftRight, CheckCircle, AlertCircle, ChevronRight, Beef, Users, FileCheck, ClipboardList } from 'lucide-react';
+import { ArrowLeftRight, CheckCircle, AlertCircle, ChevronRight, Beef, Users, FileCheck, ClipboardList, RefreshCw } from 'lucide-react';
 import SpeciesIcon from '../components/ui/SpeciesIcon';
 
 function StepIndicator({ currentStep, totalSteps, labels }) {
@@ -110,11 +110,24 @@ export default function RedisperseAnimalPage() {
         labels={['Select Animal', 'Transfer Reason', 'New Beneficiary', 'Confirm']}
       />
 
-      {/* Error display */}
+      {/* Error display with retry */}
       {redisperseMutation.isError && (
         <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200/60 rounded-xl text-red-700 text-sm animate-fade-in" role="alert">
           <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-          <p>{redisperseMutation.error.response?.data?.error || 'Re-dispersal failed.'}</p>
+          <div className="flex-1">
+            <p>{redisperseMutation.error?.message === 'Network Error' || !navigator.onLine
+              ? 'You appear to be offline. Please check your connection and retry.'
+              : redisperseMutation.error.response?.data?.error || 'Re-dispersal failed.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => redisperseMutation.reset()}
+              className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-800 transition-colors"
+            >
+              <RefreshCw className="h-3 w-3" />
+              Dismiss and retry
+            </button>
+          </div>
         </div>
       )}
 

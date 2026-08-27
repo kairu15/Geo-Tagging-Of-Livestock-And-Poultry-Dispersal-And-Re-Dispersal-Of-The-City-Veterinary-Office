@@ -120,46 +120,50 @@ export default function ReportsPage() {
 
       {/* Charts */}
       {summary && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-4 sm:p-6">
             <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
               <BarChart3 className="h-4 w-4 text-green-600" />
               Dispersals by Species
             </h3>
             {summary.by_species?.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={summary.by_species} barGap={4}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="animal__species__name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
-                  <Bar dataKey="dispersals" fill="#16a34a" name="Initial Dispersals" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="redispersals" fill="#2563eb" name="Re-Dispersals" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="overflow-x-auto -mx-2 px-2">
+                <ResponsiveContainer width="100%" height={300} minWidth={Math.max(summary.by_species.length * 80, 280)}>
+                  <BarChart data={summary.by_species} barGap={4}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="animal__species__name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} interval={0} angle={summary.by_species.length > 4 ? -30 : 0} textAnchor={summary.by_species.length > 4 ? 'end' : 'middle'} height={summary.by_species.length > 4 ? 60 : 30} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                    <Bar dataKey="dispersals" fill="#16a34a" name="Initial Dispersals" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="redispersals" fill="#2563eb" name="Re-Dispersals" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             ) : (
               <p className="text-slate-400 text-sm text-center py-8">No data available</p>
             )}
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6">
+          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-4 sm:p-6">
             <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
               <BarChart3 className="h-4 w-4 text-blue-600" />
               Dispersals by Barangay
             </h3>
             {summary.by_barangay?.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={summary.by_barangay} barGap={4}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="beneficiary__barangay__name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                  <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
-                  <Bar dataKey="dispersals" fill="#16a34a" name="Initial Dispersals" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="redispersals" fill="#8b5cf6" name="Re-Dispersals" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="overflow-x-auto -mx-2 px-2">
+                <ResponsiveContainer width="100%" height={300} minWidth={Math.max(summary.by_barangay.length * 80, 280)}>
+                  <BarChart data={summary.by_barangay} barGap={4}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                    <XAxis dataKey="beneficiary__barangay__name" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} interval={0} angle={summary.by_barangay.length > 3 ? -45 : 0} textAnchor={summary.by_barangay.length > 3 ? 'end' : 'middle'} height={summary.by_barangay.length > 3 ? 70 : 30} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                    <Bar dataKey="dispersals" fill="#16a34a" name="Initial Dispersals" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="redispersals" fill="#8b5cf6" name="Re-Dispersals" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             ) : (
               <p className="text-slate-400 text-sm text-center py-8">No data available</p>
             )}
@@ -169,7 +173,7 @@ export default function ReportsPage() {
 
       {/* KPI Summary */}
       {summary && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
           <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6">
             <h3 className="text-sm font-semibold text-slate-900 mb-4">Overall Summary</h3>
             <div className="space-y-3">
@@ -252,9 +256,13 @@ export default function ReportsPage() {
       )}
 
       {(summaryLoading || freqLoading) && (
-        <div className="text-center text-slate-400 py-4 flex items-center justify-center gap-2">
-          <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
-          Loading reports...
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6">
+              <div className="skeleton h-4 w-32 rounded mb-4" />
+              <div className="skeleton h-[250px] rounded-xl" />
+            </div>
+          ))}
         </div>
       )}
     </div>

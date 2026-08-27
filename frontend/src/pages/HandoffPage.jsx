@@ -17,9 +17,9 @@ export default function HandoffPage() {
 
   const toast = useToast();
   const handoff = useHandoffCustodianship();
-  const { data: tagsData } = useGeoTags({ is_active: true });
-  const { data: caretakersData } = useCaretakers();
-  const { data: reasonsData } = useHandoffReasons();
+  const { data: tagsData, isLoading: tagsLoading } = useGeoTags({ is_active: true });
+  const { data: caretakersData, isLoading: caretakersLoading } = useCaretakers();
+  const { data: reasonsData, isLoading: reasonsLoading } = useHandoffReasons();
   const { data: barangaysData } = useBarangays();
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm();
@@ -120,17 +120,21 @@ export default function HandoffPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Geo-Tag *</label>
-              <select
-                {...register('geo_tag_id', { required: 'Select a tag' })}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
-              >
-                <option value="">Select tagged animal...</option>
-                {activeTags.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.tag_code} — {t.animal_tag}
-                  </option>
-                ))}
-              </select>
+              {tagsLoading ? (
+                <div className="skeleton h-10 w-full rounded-lg" />
+              ) : (
+                <select
+                  {...register('geo_tag_id', { required: 'Select a tag' })}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+                >
+                  <option value="">Select tagged animal...</option>
+                  {activeTags.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.tag_code} — {t.animal_tag}
+                    </option>
+                  ))}
+                </select>
+              )}
               {errors.geo_tag_id && (
                 <p className="text-red-500 text-xs mt-1">{errors.geo_tag_id.message}</p>
               )}
@@ -142,17 +146,21 @@ export default function HandoffPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Handoff Reason *</label>
-              <select
-                {...register('end_reason_id', { required: 'Select a reason' })}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
-              >
-                <option value="">Select reason...</option>
-                {reasons.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
+              {reasonsLoading ? (
+                <div className="skeleton h-10 w-full rounded-lg" />
+              ) : (
+                <select
+                  {...register('end_reason_id', { required: 'Select a reason' })}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+                >
+                  <option value="">Select reason...</option>
+                  {reasons.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              )}
               {errors.end_reason_id && (
                 <p className="text-red-500 text-xs mt-1">{errors.end_reason_id.message}</p>
               )}

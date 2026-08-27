@@ -30,7 +30,7 @@ function FlyTo({ position }) {
   return null;
 }
 
-export default function MapPicker({ position, setPosition, label = 'Pin Location', hint = 'Search for a location', className = '' }) {
+export default function MapPicker({ position, setPosition, label = 'Pin Location', hint = 'Search for a location', className }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -156,7 +156,7 @@ export default function MapPicker({ position, setPosition, label = 'Pin Location
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6">
+    <div className={`bg-white rounded-xl border border-gray-200 p-6 ${className || ''}`}>
       <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2 flex items-center gap-2">
         <MapPin className="h-4 w-4 text-green-600" />
         {label}

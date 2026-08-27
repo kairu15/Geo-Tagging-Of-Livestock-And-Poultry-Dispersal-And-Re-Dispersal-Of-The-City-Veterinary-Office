@@ -14,7 +14,7 @@ export default function CheckInPage() {
 
   const toast = useToast();
   const createCheckin = useCreateCheckin();
-  const { data: custsData } = useCustodianships({ status: 'ACTIVE' });
+  const { data: custsData, isLoading: custsLoading } = useCustodianships({ status: 'ACTIVE' });
 
   const { register, handleSubmit, formState: { errors } } = useForm();
 
@@ -106,17 +106,26 @@ export default function CheckInPage() {
           </h2>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Active Custodianship *</label>
-            <select
-              {...register('custodianship_id', { required: 'Select a custodianship' })}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
-            >
-              <option value="">Select active custodianship...</option>
-              {activeCustodianships.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.tag_code} — {c.animal_tag} → {c.caretaker_name} (since {c.start_date})
-                </option>
-              ))}
-            </select>
+            {custsLoading ? (
+              <div className="skeleton h-10 w-full rounded-lg" />
+            ) : (
+              <>
+                <select
+                  {...register('custodianship_id', { required: 'Select a custodianship' })}
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+                >
+                  <option value="">Select active custodianship...</option>
+                  {activeCustodianships.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.tag_code} — {c.animal_tag} → {c.caretaker_name} (since {c.start_date})
+                    </option>
+                  ))}
+                </select>
+                {activeCustodianships.length === 0 && (
+                  <p className="text-xs text-gray-400 mt-1">No active custodianships found.</p>
+                )}
+              </>
+            )}
             {errors.custodianship_id && (
               <p className="text-red-500 text-xs mt-1">{errors.custodianship_id.message}</p>
             )}

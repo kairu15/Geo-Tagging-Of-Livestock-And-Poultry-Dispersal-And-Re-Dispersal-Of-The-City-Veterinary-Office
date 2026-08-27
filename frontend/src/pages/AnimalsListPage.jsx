@@ -50,7 +50,7 @@ export default function AnimalsListPage() {
             {isLoading ? 'Loading...' : `${data?.count || 0} total animals`}
           </p>
         </div>
-        {canWrite && (
+        {canWrite ? (
           <Link
             to="/animals/register"
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all duration-150 text-sm font-medium shadow-md shadow-green-600/15 hover:shadow-lg hover:shadow-green-600/20"
@@ -58,6 +58,20 @@ export default function AnimalsListPage() {
             <Plus className="h-4 w-4" />
             Register Animal
           </Link>
+        ) : (
+          <div className="relative group">
+            <button
+              disabled
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-400 rounded-xl text-sm font-medium cursor-not-allowed"
+              aria-label="Register Animal (read-only)"
+            >
+              <Plus className="h-4 w-4" />
+              Register Animal
+            </button>
+            <div className="absolute right-0 top-full mt-1 w-48 px-3 py-2 bg-slate-800 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50">
+              View only — contact a Supervisor to register animals
+            </div>
+          </div>
         )}
       </div>
 
