@@ -20,6 +20,20 @@ const CARETAKER_LABELS = {
   CVO_HOLDING_FACILITY: 'CVO Facility',
 };
 
+// Tile layer configurations
+const TILE_LAYERS = {
+  stadia: {
+    name: 'Stadia Maps',
+    url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://osm.org/copyright">OpenStreetMap</a>',
+  },
+  osm: {
+    name: 'OpenStreetMap',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://osm.org/copyright">OpenStreetMap</a> contributors',
+  },
+};
+
 function makeIcon(color) {
   return L.divIcon({
     className: '',
@@ -37,6 +51,7 @@ function makeIcon(color) {
 export default function LiveTrackingMapLayer({ filters = {}, height = '500px', onFeatureClick }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
+  const tileLayerRef = useRef(null);
   const geoGroupRef = useRef(null);
   const dispGroupRef = useRef(null);
   const dotsGroupRef = useRef(null);
@@ -44,6 +59,7 @@ export default function LiveTrackingMapLayer({ filters = {}, height = '500px', o
   const [panelOpen, setPanelOpen] = useState(true);
   const [showGeo, setShowGeo] = useState(true);
   const [showDispersal, setShowDispersal] = useState(true);
+  const [activeTile, setActiveTile] = useState('stadia');
   const [markerCount, setMarkerCount] = useState(0);
 
   const { data: geoData, isLoading: geoLoading } = useActiveGeoMap(filters);
@@ -168,9 +184,11 @@ export default function LiveTrackingMapLayer({ filters = {}, height = '500px', o
       scrollWheelZoom: true,
     });
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://osm.org/copyright">OSM</a>',
-      maxZoom: 19,
+    // Add default tile layer (Stadia Maps)
+    const tileConfig = TILE_LAYERS[activeTile];
+    tileLayerRef.current = L.tileLayer(tileConfig.url, {
+      attribution: tileConfig.attribution,
+      maxZoom: 20,
     }).addTo(map);
 
     mapRef.current = map;
@@ -184,6 +202,21 @@ export default function LiveTrackingMapLayer({ filters = {}, height = '500px', o
       mapRef.current = null;
     };
   }, []);
+
+  // Handle tile layer changes
+  useEffect(() => {
+    if (!mapRef.current || !tileLayerRef.current) return;
+
+    // Remove old tile layer
+    mapRef.current.removeLayer(tileLayerRef.current);
+
+    // Add new tile layer
+    const tileConfig = TILE_LAYERS[activeTile];
+    tileLayerRef.current = L.tileLayer(tileConfig.url, {
+      attribution: tileConfig.attribution,
+      maxZoom: 20,
+    }).addTo(mapRef.current);
+  }, [activeTile]);
 
   // When data or toggles change, try adding markers
   useEffect(() => {
@@ -225,23 +258,56 @@ export default function LiveTrackingMapLayer({ filters = {}, height = '500px', o
         </button>
         {panelOpen && (
           <div className="px-3 pb-3 space-y-2 border-t border-gray-100 pt-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={showGeo} onChange={e => setShowGeo(e.target.checked)}
-                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500" />
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-purple-500" />
-                <span className="text-xs font-medium text-gray-700">Geo-Tag Custody</span>
+            {/* Map Style Toggle */}
+            <div>
+              <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Map Style</p>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setActiveTile('stadia')}
+                  className={`flex-1 px-2 py-1.5 text-[11px] font-medium rounded-md transition-colors ${
+                    activeTile === 'stadia'
+                      ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                      : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'
+                  }`}
+                >
+                  Stadia Maps
+                </button>
+                <button
+                  onClick={() => setActiveTile('osm')}
+                  className={`flex-1 px-2 py-1.5 text-[11px] font-medium rounded-md transition-colors ${
+                    activeTile === 'osm'
+                      ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                      : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'
+                  }`}
+                >
+                  OpenStreetMap
+                </button>
               </div>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={showDispersal} onChange={e => setShowDispersal(e.target.checked)}
-                className="rounded border-gray-300 text-green-600 focus:ring-green-500" />
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-green-500" />
-                <span className="text-xs font-medium text-gray-700">Dispersal Records</span>
-              </div>
-            </label>
-            <div className="pt-2 border-t border-gray-100">
+            </div>
+
+            {/* Data Layer Toggles */}
+            <div className="pt-1">
+              <p className="text-[10px] font-medium text-gray-400 uppercase mb-1.5">Data Layers</p>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={showGeo} onChange={e => setShowGeo(e.target.checked)}
+                  className="rounded border-gray-300 text-purple-600 focus:ring-purple-500" />
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-purple-500" />
+                  <span className="text-xs font-medium text-gray-700">Geo-Tag Custody</span>
+                </div>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer mt-1">
+                <input type="checkbox" checked={showDispersal} onChange={e => setShowDispersal(e.target.checked)}
+                  className="rounded border-gray-300 text-green-600 focus:ring-green-500" />
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                  <span className="text-xs font-medium text-gray-700">Dispersal Records</span>
+                </div>
+              </label>
+            </div>
+
+            {/* Legend */}
+            <div className="pt-1 border-t border-gray-100">
               <p className="text-[10px] font-medium text-gray-400 uppercase mb-1">Caretaker Types</p>
               {Object.entries(CARETAKER_COLORS).map(([type, color]) => (
                 <div key={type} className="flex items-center gap-1.5 mb-0.5">

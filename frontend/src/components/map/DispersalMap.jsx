@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, LayersControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useActiveAnimalsMap, useActiveAnimalsPaths } from '../../api/hooks';
 import AnimalDetailModal from '../AnimalDetailModal';
+import { Map, MapPin } from 'lucide-react';
 
 const BAYAWAN = [9.6894, 122.8353];
 
@@ -143,10 +144,20 @@ export default function DispersalMap({ height = '500px', onAnimalSelect }) {
         style={{ height: '100%', width: '100%', borderRadius: 12 }}
         scrollWheelZoom={true}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-        />
+        <LayersControl position="topright">
+          <LayersControl.BaseLayer checked name="Stadia Maps">
+            <TileLayer
+              attribution="&copy; <a href='https://stadiamaps.com/'>Stadia Maps</a> &copy; <a href='https://openmaptiles.org/'>OpenMapTiles</a> &copy; <a href='https://osm.org/copyright'>OpenStreetMap</a>"
+              url="https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png"
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="OpenStreetMap">
+            <TileLayer
+              attribution="&copy; <a href='https://osm.org/copyright'>OpenStreetMap</a> contributors"
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+          </LayersControl.BaseLayer>
+        </LayersControl>
 
         <FitBounds features={features} />
 

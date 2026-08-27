@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, LayersControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { MapPin, Search, X } from 'lucide-react';
+import { MapPin, Search, X, Crosshair, Loader2 } from 'lucide-react';
+import { useToast } from '../ui/Toast';
 
 const BAYAWAN = [9.6894, 122.8353];
 
@@ -29,14 +30,16 @@ function FlyTo({ position }) {
   return null;
 }
 
-export default function MapPicker({ position, setPosition, label = 'Pin Location', hint = 'Search for a location' }) {
+export default function MapPicker({ position, setPosition, label = 'Pin Location', hint = 'Search for a location', className = '' }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [open, setOpen] = useState(false);
+  const [locating, setLocating] = useState(false);
   const debounceRef = useRef(null);
   const wrapperRef = useRef(null);
   const abortRef = useRef(null);
+  const toast = useToast();
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -118,6 +121,40 @@ export default function MapPicker({ position, setPosition, label = 'Pin Location
     clearTimeout(debounceRef.current);
   };
 
+  const handleUseMyLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser.');
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setPosition([latitude, longitude]);
+        setQuery(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+        setLocating(false);
+        toast.success('Location captured!');
+      },
+      (err) => {
+        setLocating(false);
+        switch (err.code) {
+          case err.PERMISSION_DENIED:
+            toast.error('Location permission denied. Please enable location access in your browser settings.');
+            break;
+          case err.POSITION_UNAVAILABLE:
+            toast.error('Location information unavailable. Please try again.');
+            break;
+          case err.TIMEOUT:
+            toast.error('Location request timed out. Please try again.');
+            break;
+          default:
+            toast.error('Unable to get your location. Please tap the map instead.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  };
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6">
       <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2 flex items-center gap-2">
@@ -148,6 +185,27 @@ export default function MapPicker({ position, setPosition, label = 'Pin Location
             </button>
           )}
         </div>
+
+        {/* Use my location button */}
+        <button
+          type="button"
+          onClick={handleUseMyLocation}
+          disabled={locating}
+          className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          aria-label="Use my current GPS location"
+        >
+          {locating ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Getting GPS fix...
+            </>
+          ) : (
+            <>
+              <Crosshair className="h-4 w-4" />
+              Use my current location
+            </>
+          )}
+        </button>
 
         {/* Loading spinner */}
         {searching && (
@@ -196,17 +254,27 @@ export default function MapPicker({ position, setPosition, label = 'Pin Location
       </div>
 
       {/* Map */}
-      <div style={{ height: '300px', borderRadius: '12px', overflow: 'hidden' }}>
+      <div className="h-[280px] sm:h-[300px] md:h-[350px] rounded-xl overflow-hidden">
         <MapContainer
           center={position || BAYAWAN}
           zoom={12}
           style={{ height: '100%', width: '100%' }}
           scrollWheelZoom={true}
         >
-          <TileLayer
-            attribution='&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://osm.org/copyright">OSM</a>'
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-          />
+          <LayersControl position="topright">
+            <LayersControl.BaseLayer checked name="Stadia Maps">
+              <TileLayer
+                attribution="&copy; <a href='https://stadiamaps.com/'>Stadia Maps</a> &copy; <a href='https://openmaptiles.org/'>OpenMapTiles</a> &copy; <a href='https://osm.org/copyright'>OpenStreetMap</a>"
+                url="https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png"
+              />
+            </LayersControl.BaseLayer>
+            <LayersControl.BaseLayer name="OpenStreetMap">
+              <TileLayer
+                attribution="&copy; <a href='https://osm.org/copyright'>OpenStreetMap</a> contributors"
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+            </LayersControl.BaseLayer>
+          </LayersControl>
           {position && <Marker position={position} icon={markerIcon} />}
           <FlyTo position={position} />
         </MapContainer>

@@ -1,14 +1,29 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 const BAYAWAN_CENTER = [9.6894, 122.8353];
 const DRAW_DURATION = 2000;
 
+// Tile layer configurations
+const TILE_LAYERS = {
+  stadia: {
+    name: 'Stadia Maps',
+    url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://osm.org/copyright">OpenStreetMap</a>',
+  },
+  osm: {
+    name: 'OpenStreetMap',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://osm.org/copyright">OpenStreetMap</a> contributors',
+  },
+};
+
 export default function CustodyTrailMap({ trailData, height = '400px' }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const timerRef = useRef(null);
+  const [activeTile, setActiveTile] = useState('stadia');
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -31,10 +46,22 @@ export default function CustodyTrailMap({ trailData, height = '400px' }) {
         scrollWheelZoom: true,
       });
 
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://osm.org/copyright">OSM</a>',
-        maxZoom: 19,
+      // Add default tile layer
+      const tileConfig = TILE_LAYERS[activeTile];
+      L.tileLayer(tileConfig.url, {
+        attribution: tileConfig.attribution,
+        maxZoom: 20,
       }).addTo(map);
+
+      // Add layer control
+      const baseLayers = {};
+      for (const [key, config] of Object.entries(TILE_LAYERS)) {
+        baseLayers[config.name] = L.tileLayer(config.url, {
+          attribution: config.attribution,
+          maxZoom: 20,
+        });
+      }
+      L.control.layers(baseLayers, null, { position: 'topright' }).addTo(map);
 
       mapRef.current = map;
 

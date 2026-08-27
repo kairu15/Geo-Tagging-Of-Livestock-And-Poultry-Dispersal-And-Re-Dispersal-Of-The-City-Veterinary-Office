@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { ClipboardCheck, CheckCircle, AlertCircle, Camera } from 'lucide-react';
+import { ClipboardCheck, CheckCircle, AlertCircle, Camera, Maximize2, Minimize2, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { useCustodianships, useCreateCheckin } from '../api/hooks';
 import { useToast } from '../components/ui/Toast';
 import MapPicker from '../components/map/MapPicker';
@@ -20,9 +20,11 @@ export default function CheckInPage() {
 
   const activeCustodianships = custsData?.results || [];
 
+  const [mapFullscreen, setMapFullscreen] = useState(false);
+
   const onSubmit = async (data) => {
     if (!position) {
-      alert('Please click on the map to set the location.');
+      toast.error('Please tap the map or use your GPS location to set the check-in point.');
       return;
     }
 
@@ -38,7 +40,10 @@ export default function CheckInPage() {
       await createCheckin.mutateAsync(formData);
       setSuccess(true);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Check-in failed.');
+      const msg = err?.message === 'Network Error'
+        ? 'You appear to be offline. Check-in will be retried when connectivity returns.'
+        : err.response?.data?.error || 'Check-in failed. Please try again.';
+      toast.error(msg);
     }
   };
 
@@ -140,6 +145,7 @@ export default function CheckInPage() {
                   <input
                     type="file"
                     accept="image/*"
+                    capture="environment"
                     className="hidden"
                     onChange={(e) => setPhotoFile(e.target.files[0])}
                   />
@@ -159,7 +165,24 @@ export default function CheckInPage() {
         </div>
 
         {/* Location Pin */}
-        <MapPicker position={position} setPosition={setPosition} />
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setMapFullscreen(!mapFullscreen)}
+            className="absolute top-3 right-3 z-[9998] flex items-center gap-1.5 px-2.5 py-1.5 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 shadow-sm transition-colors"
+            aria-label={mapFullscreen ? 'Exit full-screen map' : 'Full-screen map for precise tapping'}
+          >
+            {mapFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">{mapFullscreen ? 'Exit full-screen' : 'Full-screen'}</span>
+          </button>
+          <div className={mapFullscreen ? 'fixed inset-0 z-[9997] bg-white' : ''}>
+            <MapPicker
+              position={position}
+              setPosition={setPosition}
+              className={mapFullscreen ? 'h-full flex flex-col' : ''}
+            />
+          </div>
+        </div>
 
         {/* Submit */}
         <div className="flex justify-end gap-3">
@@ -173,9 +196,14 @@ export default function CheckInPage() {
           <button
             type="submit"
             disabled={createCheckin.isPending}
-            className="px-6 py-2.5 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-2.5 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {createCheckin.isPending ? 'Recording...' : 'Record Check-in'}
+            {createCheckin.isPending ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Recording...
+              </>
+            ) : 'Record Check-in'}
           </button>
         </div>
       </form>
