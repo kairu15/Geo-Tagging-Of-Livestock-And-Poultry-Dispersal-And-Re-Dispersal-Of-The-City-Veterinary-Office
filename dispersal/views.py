@@ -18,6 +18,7 @@ from .services import (
 from accounts.permissions import IsOfficerOrAbove, IsSupervisorOrAbove, IsReadOnly, IsAuthenticatedAndNotReadOnly
 from livestock.models import Animal
 from beneficiaries.models import Beneficiary
+from notifications.models import create_notification, create_notifications_for_role
 
 
 class TransferReasonViewSet(viewsets.ModelViewSet):
@@ -97,6 +98,15 @@ class ReDispersalRequestViewSet(viewsets.ModelViewSet):
             req.reviewed_at = timezone.now()
             req.save()
 
+            # Notify requesting user of approval
+            create_notification(
+                recipient=req.requested_by,
+                notification_type="REDISPERSAL_APPROVED",
+                title=f"Re-dispersal approved: {req.animal}",
+                message=f"Your re-dispersal request for {req.animal} has been approved.",
+                related_ownership_record=record if 'record' in locals() else None,
+            )
+
             return Response({"status": "approved", "request_id": req.id})
 
         except DomainError as e:
@@ -118,6 +128,14 @@ class ReDispersalRequestViewSet(viewsets.ModelViewSet):
         from django.utils import timezone
         req.reviewed_at = timezone.now()
         req.save()
+
+        # Notify requesting user of rejection
+        create_notification(
+            recipient=req.requested_by,
+            notification_type="REDISPERSAL_REJECTED",
+            title=f"Re-dispersal rejected: {req.animal}",
+            message=f"Your re-dispersal request for {req.animal} has been rejected. {req.review_notes or ''}",
+        )
 
         return Response({"status": "rejected", "request_id": req.id})
 
@@ -214,6 +232,15 @@ def disperse_view(request):
         if warnings:
             response_data["quarantine_warnings"] = warnings
 
+        # Notify Supervisors of the new dispersal
+        create_notifications_for_role(
+            role="SUPERVISOR",
+            notification_type="DISPERSAL_REQUEST",
+            title=f"Animal dispersed: {animal}",
+            message=f"{animal} has been dispersed to {beneficiary.full_name}.",
+            related_ownership_record=record,
+        )
+
         return Response(response_data, status=status.HTTP_201_CREATED)
 
     except Animal.DoesNotExist:
@@ -264,6 +291,15 @@ def redisperse_view(request):
         response_data = OwnershipRecordSerializer(record).data
         if warnings:
             response_data["quarantine_warnings"] = warnings
+
+        # Notify Supervisors of the re-dispersal
+        create_notifications_for_role(
+            role="SUPERVISOR",
+            notification_type="REDISPERSAL_REQUEST",
+            title=f"Animal re-dispersed: {animal}",
+            message=f"{animal} has been re-dispersed to {new_beneficiary.full_name}.",
+            related_ownership_record=record,
+        )
 
         return Response(response_data, status=status.HTTP_201_CREATED)
 

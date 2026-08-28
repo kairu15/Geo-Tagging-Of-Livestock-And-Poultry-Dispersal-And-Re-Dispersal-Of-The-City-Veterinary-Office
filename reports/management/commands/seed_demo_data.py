@@ -5,15 +5,34 @@ Creates realistic data including:
 - Barangays
 - Species and breeds
 - Transfer reasons
-- Users (Admin, Officers, Supervisors)
+- Users (Admin, Officer, Supervisor, Coordinator)
 - Beneficiaries with geo-coordinates
 - Animals (various species, some batch poultry)
 - Ownership records forming multi-hop re-dispersal chains
 
-Usage: python manage.py seed_demo_data
+Provisioning behaviour
+----------------------
+* **Production** (DEBUG=False): each user receives a securely generated random
+  password printed once to the console.  ``must_change_password`` is set so
+  the user is forced to pick a real password on first login.
+* **Development** (DEBUG=True or ``--dev-only``): known throwaway passwords
+  are used so local setup stays fast.
+
+Usage
+-----
+    # Production — prints random passwords
+    python manage.py seed_demo_data
+
+    # Development — known throwaway passwords
+    python manage.py seed_demo_data --dev-only
+    DJANGO_DEBUG=True python manage.py seed_demo_data
 """
 import random
+import secrets
+import string
 from datetime import date, timedelta
+
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 
@@ -25,10 +44,53 @@ from dispersal.services import disperse_animal, redisperse_animal
 User = get_user_model()
 
 
+def _generate_password(length: int = 16) -> str:
+    """Return a cryptographically secure random password."""
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    password = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.digits),
+        secrets.choice("!@#$%^&*"),
+    ]
+    password += [secrets.choice(alphabet) for _ in range(length - len(password))]
+    secrets.SystemRandom().shuffle(password)
+    return "".join(password)
+
+
+# Known throwaway passwords used ONLY in local development.
+_DEV_PASSWORDS = {
+    "admin": "admin123",
+    "dr.santos": "officer123",
+    "supervisor.reyes": "super123",
+    "coord.delaCruz": "coord123",
+}
+
+
 class Command(BaseCommand):
     help = "Seed demo data for the CVO livestock dispersal system"
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--dev-only",
+            action="store_true",
+            help="Use known throwaway dev passwords (required when DEBUG is False)",
+        )
+
     def handle(self, *args, **options):
+        dev_only = options["dev_only"]
+        use_dev_passwords = dev_only or settings.DEBUG
+
+        if not use_dev_passwords and not settings.DEBUG:
+            self.stderr.write(
+                self.style.ERROR(
+                    "ERROR: In production (DEBUG=False), you must use either\n"
+                    "  --dev-only  to explicitly opt into known dev passwords, or\n"
+                    "  omit the flag to generate secure random passwords.\n"
+                )
+            )
+            return
+
         self.stdout.write("Seeding demo data...")
 
         # -------------------------------------------------------------------
@@ -92,7 +154,13 @@ class Command(BaseCommand):
         # -------------------------------------------------------------------
         # 4. Users
         # -------------------------------------------------------------------
-        admin_user, _ = User.objects.get_or_create(
+        credentials = []  # (username, password, role) tuples to print at the end
+
+        # --- Admin ---
+        admin_pw = (
+            _DEV_PASSWORDS["admin"] if use_dev_passwords else _generate_password()
+        )
+        admin_user, created = User.objects.get_or_create(
             username="admin",
             defaults={
                 "first_name": "System",
@@ -100,12 +168,19 @@ class Command(BaseCommand):
                 "role": "ADMIN",
                 "is_staff": True,
                 "is_superuser": True,
+                "must_change_password": not use_dev_passwords,
             },
         )
-        admin_user.set_password("admin123")
+        admin_user.set_password(admin_pw)
+        admin_user.must_change_password = not use_dev_passwords
         admin_user.save()
+        credentials.append(("admin", admin_pw, "ADMIN"))
 
-        officer1, _ = User.objects.get_or_create(
+        # --- Officer ---
+        officer_pw = (
+            _DEV_PASSWORDS["dr.santos"] if use_dev_passwords else _generate_password()
+        )
+        officer1, created = User.objects.get_or_create(
             username="dr.santos",
             defaults={
                 "first_name": "Maria",
@@ -113,23 +188,60 @@ class Command(BaseCommand):
                 "role": "OFFICER",
                 "contact_number": "09171234567",
                 "assigned_barangay": barangays["Poblacion"],
+                "must_change_password": not use_dev_passwords,
             },
         )
-        officer1.set_password("officer123")
+        officer1.set_password(officer_pw)
+        officer1.must_change_password = not use_dev_passwords
         officer1.save()
+        credentials.append(("dr.santos", officer_pw, "OFFICER"))
 
-        supervisor1, _ = User.objects.get_or_create(
+        # --- Supervisor ---
+        supervisor_pw = (
+            _DEV_PASSWORDS["supervisor.reyes"]
+            if use_dev_passwords
+            else _generate_password()
+        )
+        supervisor1, created = User.objects.get_or_create(
             username="supervisor.reyes",
             defaults={
                 "first_name": "Juan",
                 "last_name": "Reyes",
                 "role": "SUPERVISOR",
                 "contact_number": "09181234567",
+                "must_change_password": not use_dev_passwords,
             },
         )
-        supervisor1.set_password("super123")
+        supervisor1.set_password(supervisor_pw)
+        supervisor1.must_change_password = not use_dev_passwords
         supervisor1.save()
-        self.stdout.write("  Created 3 users (admin, officer, supervisor)")
+        credentials.append(("supervisor.reyes", supervisor_pw, "SUPERVISOR"))
+
+        # --- Coordinator (NEW) ---
+        coordinator_pw = (
+            _DEV_PASSWORDS["coord.delaCruz"]
+            if use_dev_passwords
+            else _generate_password()
+        )
+        coordinator1, created = User.objects.get_or_create(
+            username="coord.delaCruz",
+            defaults={
+                "first_name": "Liza",
+                "last_name": "Dela Cruz",
+                "role": "COORDINATOR",
+                "contact_number": "09191234567",
+                "assigned_barangay": barangays["San Isidro"],
+                "must_change_password": not use_dev_passwords,
+            },
+        )
+        coordinator1.set_password(coordinator_pw)
+        coordinator1.must_change_password = not use_dev_passwords
+        coordinator1.save()
+        credentials.append(("coord.delaCruz", coordinator_pw, "COORDINATOR"))
+
+        self.stdout.write(
+            f"  Created 4 users (admin, officer, supervisor, coordinator)"
+        )
 
         # -------------------------------------------------------------------
         # 5. Beneficiaries
@@ -219,7 +331,7 @@ class Command(BaseCommand):
         today = date.today()
 
         # Chain 1: Animal 0 (Goat) → Beneficiary 0 → Beneficiary 1 (re-dispersal)
-        rec1 = disperse_animal(
+        disperse_animal(
             animal=animals[0],
             beneficiary=beneficiaries[0],
             latitude=beneficiaries[0].latitude,
@@ -346,8 +458,23 @@ class Command(BaseCommand):
             f"  Species:     {Species.objects.count()}\n"
             f"  Animals:     {Animal.objects.count()}\n"
             f"  Records:     {OwnershipRecord.objects.count()}\n"
-            f"\n  Login credentials:\n"
-            f"    Admin:     admin / admin123\n"
-            f"    Officer:   dr.santos / officer123\n"
-            f"    Supervisor: supervisor.reyes / super123\n"
         ))
+
+        # Print credentials
+        self.stdout.write("  Login credentials:")
+        self.stdout.write("  " + "-" * 60)
+        self.stdout.write(f"  {'Username':<22} {'Password':<20} {'Role'}")
+        self.stdout.write("  " + "-" * 60)
+        for uname, pwd, role in credentials:
+            self.stdout.write(f"  {uname:<22} {pwd:<20} {role}")
+        self.stdout.write("  " + "-" * 60)
+
+        if not use_dev_passwords:
+            self.stdout.write("")
+            self.stdout.write(
+                self.style.WARNING(
+                    "  ⚠  These passwords are shown ONCE. Distribute them securely.\n"
+                    "     Users will be forced to set a new password on first login."
+                )
+            )
+        self.stdout.write("")

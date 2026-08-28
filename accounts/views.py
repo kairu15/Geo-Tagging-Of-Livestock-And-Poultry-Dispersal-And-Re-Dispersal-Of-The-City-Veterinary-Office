@@ -5,7 +5,12 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .serializers import UserSerializer, UserCreateSerializer, LoginSerializer
+from .serializers import (
+    UserSerializer,
+    UserCreateSerializer,
+    LoginSerializer,
+    ChangePasswordSerializer,
+)
 from .permissions import IsAdmin
 
 
@@ -61,11 +66,14 @@ def login_view(request):
         )
 
     refresh = RefreshToken.for_user(user)
-    return Response({
+    response_data = {
         "access": str(refresh.access_token),
         "refresh": str(refresh),
         "user": UserSerializer(user).data,
-    })
+    }
+    if user.must_change_password:
+        response_data["must_change_password"] = True
+    return Response(response_data)
 
 
 @api_view(["GET"])
@@ -94,3 +102,37 @@ def reset_password_view(request, pk):
     user.set_password(new_password)
     user.save()
     return Response({"message": f"Password reset for {user.username}"})
+
+
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def force_change_password_view(request):
+    """Change password when must_change_password is True.
+
+    The user must provide their current (temporary) password and a new one.
+    On success the ``must_change_password`` flag is cleared.
+    """
+    serializer = ChangePasswordSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    user = request.user
+    old_password = serializer.validated_data["old_password"]
+    new_password = serializer.validated_data["new_password"]
+
+    if not user.check_password(old_password):
+        return Response(
+            {"error": "Current password is incorrect"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    user.set_password(new_password)
+    user.must_change_password = False
+    user.save()
+
+    # Issue a fresh token so the old one (with stale claims) is discarded.
+    refresh = RefreshToken.for_user(user)
+    return Response({
+        "message": "Password changed successfully",
+        "access": str(refresh.access_token),
+        "refresh": str(refresh),
+    })

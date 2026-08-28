@@ -32,6 +32,10 @@ class User(AbstractUser):
         default=True,
         help_text="False = deactivated account; still exists for audit trail.",
     )
+    must_change_password = models.BooleanField(
+        default=False,
+        help_text="If True, user must set a new password before any other action.",
+    )
 
     history = HistoricalRecords()
 

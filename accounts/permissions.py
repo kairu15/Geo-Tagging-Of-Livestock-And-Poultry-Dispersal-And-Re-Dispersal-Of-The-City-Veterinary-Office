@@ -1,6 +1,33 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 
+class MustChangePassword(BasePermission):
+    """Block all API access for users who must change their password.
+
+    Exempts the change-password and login endpoints so the user can
+    actually set a new password.  This is the DRF-level equivalent of
+    ``MustChangePasswordMiddleware`` — enforced server-side and
+    impossible to bypass from the frontend.
+    """
+
+    _ALLOWED_PATHS = (
+        "/api/v1/auth/change-password",
+        "/api/v1/auth/login",
+        "/api/v1/auth/token/refresh",
+    )
+
+    def has_permission(self, request, view):
+        user = request.user
+        if (
+            user is not None
+            and user.is_authenticated
+            and getattr(user, "must_change_password", False)
+        ):
+            if not any(request.path.startswith(p) for p in self._ALLOWED_PATHS):
+                return False
+        return True
+
+
 class IsAdmin(BasePermission):
     """Full system admin access."""
 

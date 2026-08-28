@@ -1,8 +1,10 @@
 """
-Tests for accounts app — user roles, permissions, and auth endpoints.
+Tests for accounts app — user roles, permissions, auth endpoints,
+and must_change_password enforcement.
 """
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.core.cache import cache
+from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -72,6 +74,7 @@ class LoginAPITest(TestCase):
     """Test the JWT login endpoint."""
 
     def setUp(self):
+        cache.clear()  # Reset throttle counters between tests
         self.client = APIClient()
         self.user = User.objects.create_user(
             username="testuser", password="testpass123", role="OFFICER"
@@ -86,6 +89,24 @@ class LoginAPITest(TestCase):
         self.assertIn("access", res.data)
         self.assertIn("refresh", res.data)
         self.assertIn("user", res.data)
+
+    def test_login_returns_must_change_password_flag(self):
+        self.user.must_change_password = True
+        self.user.save()
+        res = self.client.post("/api/v1/auth/login/", {
+            "username": "testuser",
+            "password": "testpass123",
+        })
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(res.data.get("must_change_password"))
+
+    def test_login_does_not_return_flag_when_false(self):
+        res = self.client.post("/api/v1/auth/login/", {
+            "username": "testuser",
+            "password": "testpass123",
+        })
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertNotIn("must_change_password", res.data)
 
     def test_login_wrong_password(self):
         res = self.client.post("/api/v1/auth/login/", {
@@ -132,3 +153,85 @@ class LoginAPITest(TestCase):
             {"new_password": "newpass123"},
         )
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class MustChangePasswordTest(TestCase):
+    """Test the must_change_password enforcement and force-change endpoint."""
+
+    def setUp(self):
+        cache.clear()  # Reset throttle counters between tests
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="newuser",
+            password="temppass123",
+            role="OFFICER",
+            must_change_password=True,
+        )
+
+    def test_must_change_password_blocks_api_access(self):
+        """Authenticated requests should return 403 when must_change_password is True."""
+        self.client.force_authenticate(user=self.user)
+        res = self.client.get("/api/v1/auth/me/")
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(res.data["code"], "MUST_CHANGE_PASSWORD")
+
+    def test_must_change_password_allows_change_password_endpoint(self):
+        """The change-password endpoint must remain accessible."""
+        self.client.force_authenticate(user=self.user)
+        res = self.client.post("/api/v1/auth/change-password/", {
+            "old_password": "temppass123",
+            "new_password": "RealPass1!x",
+        })
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_force_change_password_success(self):
+        """Changing password should clear must_change_password and return new tokens."""
+        self.client.force_authenticate(user=self.user)
+        res = self.client.post("/api/v1/auth/change-password/", {
+            "old_password": "temppass123",
+            "new_password": "RealPass1!x",
+        })
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("access", res.data)
+        self.assertIn("refresh", res.data)
+
+        # Verify the flag is cleared
+        self.user.refresh_from_db()
+        self.assertFalse(self.user.must_change_password)
+
+        # Verify the old password no longer works
+        self.assertFalse(self.user.check_password("temppass123"))
+        self.assertTrue(self.user.check_password("RealPass1!x"))
+
+    def test_force_change_password_wrong_old_password(self):
+        """Changing password with wrong current password should fail."""
+        self.client.force_authenticate(user=self.user)
+        res = self.client.post("/api/v1/auth/change-password/", {
+            "old_password": "wrongpassword",
+            "new_password": "RealPass1!x",
+        })
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.must_change_password)
+
+    def test_force_change_password_short_new_password(self):
+        """New password must meet minimum length."""
+        self.client.force_authenticate(user=self.user)
+        res = self.client.post("/api/v1/auth/change-password/", {
+            "old_password": "temppass123",
+            "new_password": "short",
+        })
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_me_accessible_after_password_change(self):
+        """After changing password, the user should be able to access /me/."""
+        self.client.force_authenticate(user=self.user)
+        self.client.post("/api/v1/auth/change-password/", {
+            "old_password": "temppass123",
+            "new_password": "RealPass1!x",
+        })
+
+        # Re-authenticate with fresh client to simulate new session
+        self.client.force_authenticate(user=self.user)
+        res = self.client.get("/api/v1/auth/me/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)

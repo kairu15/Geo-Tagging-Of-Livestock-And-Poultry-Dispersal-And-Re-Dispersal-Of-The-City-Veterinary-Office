@@ -27,6 +27,16 @@ export const useMe = () => {
   });
 };
 
+export const useForceChangePassword = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => api.post('/auth/change-password/', data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+};
+
 // ---------------------------------------------------------------------------
 // Beneficiaries
 // ---------------------------------------------------------------------------
@@ -459,3 +469,54 @@ export const useCreateOffspring = () => {
   });
 };
 
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+export const useNotifications = (params = {}) => {
+  return useQuery({
+    queryKey: ['notifications', params],
+    queryFn: () => api.get('/notifications/', { params }).then((r) => r.data),
+    refetchInterval: 30_000,
+  });
+};
+
+export const useUnreadNotificationCount = () => {
+  return useQuery({
+    queryKey: ['notifications-unread-count'],
+    queryFn: () => api.get('/notifications/unread_count/').then((r) => r.data),
+    refetchInterval: 30_000,
+  });
+};
+
+export const useMarkNotificationRead = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.post(`/notifications/${id}/read/`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+    },
+  });
+};
+
+export const useMarkAllNotificationsRead = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post('/notifications/read_all/'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+    },
+  });
+};
+
+export const useArchiveNotification = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api.post(`/notifications/${id}/archive/`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+    },
+  });
+};

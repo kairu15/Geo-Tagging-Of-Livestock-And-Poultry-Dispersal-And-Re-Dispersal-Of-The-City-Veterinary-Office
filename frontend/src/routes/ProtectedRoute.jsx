@@ -20,6 +20,12 @@ export default function ProtectedRoute({ children, requiredRole }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // If the user must change their password, redirect to login which
+  // handles the forced password change flow.
+  if (user?.must_change_password) {
+    return <Navigate to="/login" replace />;
+  }
+
   if (requiredRole) {
     const allowedRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
     if (!allowedRoles.includes(user?.role)) {
