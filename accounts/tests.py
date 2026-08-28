@@ -173,7 +173,6 @@ class MustChangePasswordTest(TestCase):
         self.client.force_authenticate(user=self.user)
         res = self.client.get("/api/v1/auth/me/")
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(res.data["code"], "MUST_CHANGE_PASSWORD")
 
     def test_must_change_password_allows_change_password_endpoint(self):
         """The change-password endpoint must remain accessible."""

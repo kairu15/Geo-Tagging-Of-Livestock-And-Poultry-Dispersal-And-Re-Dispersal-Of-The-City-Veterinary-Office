@@ -11,7 +11,7 @@ from .serializers import (
     LoginSerializer,
     ChangePasswordSerializer,
 )
-from .permissions import IsAdmin
+from .permissions import IsAdmin, MustChangePassword
 
 
 class LoginThrottle(AnonRateThrottle):
@@ -23,7 +23,7 @@ User = get_user_model()
 class UserListCreateView(generics.ListCreateAPIView):
     """List all users or create a new one (Admin only)."""
     queryset = User.objects.all()
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdmin, MustChangePassword]
 
     def get_serializer_class(self):
         if self.request.method == "POST":
@@ -35,7 +35,7 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Retrieve, update, or soft-deactivate a user."""
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAdmin, MustChangePassword]
 
 
 @api_view(["POST"])
@@ -77,14 +77,14 @@ def login_view(request):
 
 
 @api_view(["GET"])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([permissions.IsAuthenticated, MustChangePassword])
 def me_view(request):
     """Return the currently authenticated user's profile."""
     return Response(UserSerializer(request.user).data)
 
 
 @api_view(["POST"])
-@permission_classes([IsAdmin])
+@permission_classes([IsAdmin, MustChangePassword])
 def reset_password_view(request, pk):
     """Admin can reset a user's password."""
     try:
@@ -105,7 +105,7 @@ def reset_password_view(request, pk):
 
 
 @api_view(["POST"])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([permissions.IsAuthenticated])  # Intentionally no MustChangePassword — this IS the reset endpoint
 def force_change_password_view(request):
     """Change password when must_change_password is True.
 
