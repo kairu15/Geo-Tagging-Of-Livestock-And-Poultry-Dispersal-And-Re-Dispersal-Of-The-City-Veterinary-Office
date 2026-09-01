@@ -44,8 +44,8 @@ export default function DiseaseReportPage() {
     formData.append('event_type', data.event_type);
     formData.append('severity', data.severity);
     formData.append('event_date', data.event_date);
-    formData.append('latitude', position[0]);
-    formData.append('longitude', position[1]);
+    formData.append('latitude', parseFloat(position[0].toFixed(6)));
+    formData.append('longitude', parseFloat(position[1].toFixed(6)));
     if (data.disease_suspected_id) formData.append('disease_suspected_id', data.disease_suspected_id);
     if (data.notes) formData.append('notes', data.notes);
     if (photoFile) formData.append('photo', photoFile);
@@ -58,8 +58,8 @@ export default function DiseaseReportPage() {
       if (isNetworkError) {
         await enqueue({
           custodianship_id: 0, // placeholder for health reports
-          latitude: position[0],
-          longitude: position[1],
+          latitude: parseFloat(position[0].toFixed(6)),
+          longitude: parseFloat(position[1].toFixed(6)),
           source: 'DISEASE_REPORT',
           notes: JSON.stringify(data),
           photo: photoFile,

@@ -6,6 +6,7 @@ import {
   useGeoTags, useCaretakers, useHandoffReasons, useHandoffCustodianship,
   useBarangays,
 } from '../api/hooks';
+import SearchableBarangaySelect from '../components/ui/SearchableBarangaySelect';
 import { useToast } from '../components/ui/Toast';
 import MapPicker from '../components/map/MapPicker';
 
@@ -22,7 +23,7 @@ export default function HandoffPage() {
   const { data: reasonsData, isLoading: reasonsLoading } = useHandoffReasons();
   const { data: barangaysData } = useBarangays();
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm();
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm();
   const selectedTagId = watch('geo_tag_id');
 
   const activeTags = tagsData?.results || [];
@@ -37,8 +38,8 @@ export default function HandoffPage() {
         end_reason_id: parseInt(data.end_reason_id),
         exit_condition: data.exit_condition || 'HEALTHY',
         intake_condition: data.intake_condition || 'HEALTHY',
-        latitude: position ? position[0] : null,
-        longitude: position ? position[1] : null,
+        latitude: position ? parseFloat(position[0].toFixed(6)) : null,
+        longitude: position ? parseFloat(position[1].toFixed(6)) : null,
       };
 
       if (useExistingCaretaker && data.new_caretaker_id) {
@@ -51,8 +52,8 @@ export default function HandoffPage() {
         payload.caretaker_type = data.caretaker_type || 'INFORMAL_CARETAKER';
       }
 
-      const result = await handoff.mutateAsync(payload);
-      setSuccess(result);
+      const response = await handoff.mutateAsync(payload);
+      setSuccess(response.data);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Handoff failed.');
     }
@@ -275,17 +276,12 @@ export default function HandoffPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Barangay</label>
-                <select
-                  {...register('caretaker_barangay')}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
-                >
-                  <option value="">Select barangay...</option>
-                  {barangaysData?.results?.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
+                <SearchableBarangaySelect
+                  value={watch('caretaker_barangay') || ''}
+                  onChange={(val) => setValue('caretaker_barangay', val)}
+                  barangays={barangaysData?.results || []}
+                  placeholder="Select barangay..."
+                />
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>

@@ -32,8 +32,8 @@ export default function CheckInPage() {
 
     const formData = new FormData();
     formData.append('custodianship_id', data.custodianship_id);
-    formData.append('latitude', position[0]);
-    formData.append('longitude', position[1]);
+    formData.append('latitude', parseFloat(position[0].toFixed(6)));
+    formData.append('longitude', parseFloat(position[1].toFixed(6)));
     formData.append('source', data.source || 'FIELD_VISIT');
     if (data.notes) formData.append('notes', data.notes);
     if (photoFile) formData.append('photo', photoFile);
@@ -47,8 +47,8 @@ export default function CheckInPage() {
         // Queue for later retry
         await enqueue({
           custodianship_id: data.custodianship_id,
-          latitude: position[0],
-          longitude: position[1],
+          latitude: parseFloat(position[0].toFixed(6)),
+          longitude: parseFloat(position[1].toFixed(6)),
           source: data.source || 'FIELD_VISIT',
           notes: data.notes || '',
           photo: photoFile,

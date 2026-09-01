@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { useCreateBeneficiary, useBarangays } from '../api/hooks';
+import SearchableBarangaySelect from '../components/ui/SearchableBarangaySelect';
 import { useToast } from '../components/ui/Toast';
 import MapPicker from '../components/map/MapPicker';
 import {
@@ -40,7 +41,7 @@ export default function RegisterBeneficiaryPage() {
   const [position, setPosition] = useState(null);
   const [idImageFile, setIdImageFile] = useState(null);
 
-  const { register, handleSubmit, watch, formState: { errors } } = useForm({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
       household_head: false,
       privacy_consent_given: false,
@@ -74,8 +75,8 @@ export default function RegisterBeneficiaryPage() {
       formData.append('household_head', data.household_head ? 'true' : 'false');
       if (data.livelihood_type) formData.append('livelihood_type', data.livelihood_type);
       if (position) {
-        formData.append('latitude', position[0]);
-        formData.append('longitude', position[1]);
+        formData.append('latitude', parseFloat(position[0].toFixed(6)));
+        formData.append('longitude', parseFloat(position[1].toFixed(6)));
       }
       formData.append('privacy_consent_given', 'true');
       if (idImageFile) formData.append('id_image', idImageFile);
@@ -204,15 +205,12 @@ export default function RegisterBeneficiaryPage() {
               {barangaysLoading ? (
                 <div className="skeleton h-10 w-full rounded-xl" />
               ) : (
-                <select
-                  {...register('barangay', { required: 'Barangay is required' })}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-green-500/30 focus:border-green-500 outline-none cursor-pointer"
-                >
-                  <option value="">Select barangay...</option>
-                  {barangays.map((b) => (
-                    <option key={b.id} value={b.id}>{b.name}, {b.city_municipality}</option>
-                  ))}
-                </select>
+                <SearchableBarangaySelect
+                  value={watch('barangay') || ''}
+                  onChange={(val) => setValue('barangay', val)}
+                  barangays={barangays}
+                  placeholder="Select barangay..."
+                />
               )}
               {errors.barangay && <p className="text-red-500 text-xs mt-1">{errors.barangay.message}</p>}
             </div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Tag, CheckCircle, AlertCircle } from 'lucide-react';
 import { useTagAnimal, useAnimals, useCaretakers, useBarangays } from '../api/hooks';
+import SearchableBarangaySelect from '../components/ui/SearchableBarangaySelect';
 import { useToast } from '../components/ui/Toast';
 import MapPicker from '../components/map/MapPicker';
 
@@ -18,7 +19,7 @@ export default function TagAnimalPage() {
   const { data: caretakersData } = useCaretakers();
   const { data: barangaysData } = useBarangays();
 
-  const { register, handleSubmit, formState: { errors } } = useForm();
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm();
 
   const availableAnimals = animalsData?.results || [];
   const caretakers = caretakersData?.results || [];
@@ -29,8 +30,8 @@ export default function TagAnimalPage() {
         animal_id: parseInt(data.animal_id),
         tag_type: data.tag_type,
         intake_condition: data.intake_condition || 'HEALTHY',
-        latitude: position ? position[0] : null,
-        longitude: position ? position[1] : null,
+        latitude: position ? parseFloat(position[0].toFixed(6)) : null,
+        longitude: position ? parseFloat(position[1].toFixed(6)) : null,
       };
 
       if (useExistingCaretaker && data.caretaker_id) {
@@ -43,8 +44,8 @@ export default function TagAnimalPage() {
         payload.caretaker_type = data.caretaker_type || 'FORMAL_BENEFICIARY';
       }
 
-      const result = await tagAnimal.mutateAsync(payload);
-      setSuccess(result);
+      const response = await tagAnimal.mutateAsync(payload);
+      setSuccess(response.data);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to tag animal.');
     }
@@ -239,17 +240,12 @@ export default function TagAnimalPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Barangay</label>
-                <select
-                  {...register('caretaker_barangay')}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
-                >
-                  <option value="">Select barangay...</option>
-                  {barangaysData?.results?.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
+                <SearchableBarangaySelect
+                  value={watch('caretaker_barangay') || ''}
+                  onChange={(val) => setValue('caretaker_barangay', val)}
+                  barangays={barangaysData?.results || []}
+                  placeholder="Select barangay..."
+                />
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>

@@ -104,9 +104,9 @@ export default function MapPicker({ position, setPosition, label = 'Pin Location
   };
 
   const handleSelect = (item) => {
-    const lat = parseFloat(item.lat);
-    const lng = parseFloat(item.lon);
-    setPosition([lat, lng]);
+    const lat = parseFloat(item.lat).toFixed(6);
+    const lng = parseFloat(item.lon).toFixed(6);
+    setPosition([parseFloat(lat), parseFloat(lng)]);
     setQuery(item.display_name);
     setResults([]);
     setOpen(false);
@@ -130,8 +130,10 @@ export default function MapPicker({ position, setPosition, label = 'Pin Location
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        setPosition([latitude, longitude]);
-        setQuery(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+        const lat = parseFloat(latitude.toFixed(6));
+        const lng = parseFloat(longitude.toFixed(6));
+        setPosition([lat, lng]);
+        setQuery(`${lat}, ${lng}`);
         setLocating(false);
         toast.success('Location captured!');
       },
