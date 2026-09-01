@@ -23,7 +23,7 @@ import secrets
 import string
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -115,17 +115,13 @@ class Command(BaseCommand):
         use_dev_passwords = dev_only or settings.DEBUG
 
         if not use_dev_passwords and not settings.DEBUG:
-            # Production mode — this is the intended safe path
-            pass
-        elif not use_dev_passwords and not dev_only and not settings.DEBUG:
-            self.stderr.write(
-                self.style.ERROR(
-                    "ERROR: In production (DEBUG=False), you must use either\n"
-                    "  --dev-only  to explicitly opt into known dev passwords, or\n"
-                    "  omit the flag to generate secure random passwords.\n"
-                )
+            raise CommandError(
+                "This command creates demo/sample staff accounts and is "
+                "intended for development use only. In production "
+                "(DEBUG=False), you must use either --dev-only to explicitly "
+                "opt into dev passwords, or omit the flag to generate secure "
+                "random passwords."
             )
-            return
 
         created_count = 0
         updated_count = 0

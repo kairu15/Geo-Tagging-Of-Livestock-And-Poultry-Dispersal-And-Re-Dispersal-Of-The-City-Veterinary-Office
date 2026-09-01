@@ -1,0 +1,27 @@
+# =============================================================================
+# CVO Geo-Tagging Livestock Dispersal System — Python Dependencies
+# =============================================================================
+
+# Core framework
+Django==6.0.7
+
+# REST API
+djangorestframework==3.17.1
+djangorestframework-simplejwt==5.5.1
+drf-spectacular==0.29.0
+
+# Django plugins (actively imported in codebase)
+django-cors-headers==4.9.0
+django-environ==0.14.0
+django-filter==24.3
+django-simple-history==3.13.0
+
+# Image field support (Pillow for ImageField in models)
+Pillow==12.2.0
+
+# Production server
+gunicorn==21.2.0
+
+# Testing (optional — for local dev)
+# pytest==9.1.1
+# pytest-django==4.14.0
